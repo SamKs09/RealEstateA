@@ -28,7 +28,7 @@ interface Message {
   time: string;
 }
 
-  export default function ChatDetailScreen() {
+export default function ChatDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const params = useLocalSearchParams();
@@ -49,7 +49,7 @@ interface Message {
 
     return () => {
       // Clean up socket listeners
-      chatService.off('message:new', handleNewMessage);
+      chatService.off("message:new", handleNewMessage);
       if (threadId) {
         chatService.leaveThread(threadId);
       }
@@ -59,15 +59,15 @@ interface Message {
   const setupSocketListeners = () => {
     if (threadId) {
       chatService.joinThread(threadId);
-      chatService.on('message:new', handleNewMessage);
+      chatService.on("message:new", handleNewMessage);
     }
   };
 
   const handleNewMessage = (data: any) => {
     if (data.threadId === threadId) {
-      setMessages(prev => {
+      setMessages((prev) => {
         // Check if message already exists
-        if (prev.find(m => m._id === data.message._id)) return prev;
+        if (prev.find((m) => m._id === data.message._id)) return prev;
         return [...prev, data.message];
       });
       scrollToBottom();
@@ -77,14 +77,17 @@ interface Message {
   const loadMessages = async () => {
     if (!threadId) return;
     try {
+      // Ensure chatService has a token (it may not be initialized if navigating directly)
+      await chatService.ensureInitialized();
       const fetchedMessages = await chatService.getMessages(threadId);
       // Sort messages by creation time
       const sortedMessages = fetchedMessages.sort(
-        (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        (a: any, b: any) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
       setMessages(sortedMessages);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error("Error loading messages:", error);
     } finally {
       setLoading(false);
     }
@@ -103,13 +106,16 @@ interface Message {
       try {
         const text = messageText.trim();
         setMessageText(""); // Clear input immediately
-        
+
         const newMessage = await chatService.sendMessage(threadId, text);
-        setMessages(prev => [...prev, newMessage]);
+        setMessages((prev) => {
+          if (prev.find((m) => m._id === newMessage._id)) return prev;
+          return [...prev, newMessage];
+        });
         scrollToBottom();
       } catch (error) {
-        console.error('Error sending message:', error);
-        Alert.alert('Error', 'Failed to send message');
+        console.error("Error sending message:", error);
+        Alert.alert("Error", "Failed to send message");
       }
     }
   };
@@ -124,62 +130,114 @@ interface Message {
 
       if (!result.canceled && result.assets[0].uri) {
         // Send image
-        const newMessage = await chatService.sendImage(threadId, result.assets[0].uri);
-        setMessages(prev => [...prev, newMessage]);
+        const newMessage = await chatService.sendImage(
+          threadId,
+          result.assets[0].uri,
+        );
+        setMessages((prev) => {
+          if (prev.find((m) => m._id === newMessage._id)) return prev;
+          return [...prev, newMessage];
+        });
         scrollToBottom();
       }
     } catch (error) {
-      console.error('Error picking/sending image:', error);
-      Alert.alert('Error', 'Failed to send image');
+      console.error("Error picking/sending image:", error);
+      Alert.alert("Error", "Failed to send image");
     }
   };
 
   const renderMessage = ({ item }: { item: any }) => {
     // Determine if message is from current user
-    const senderId = item.sender?.userId?._id || item.sender?.userId || item.sender;
-    const currentUserId = user?.id || user?._id; 
-    const isMe = senderId && currentUserId && senderId.toString() === currentUserId.toString();
-    
+    const senderId =
+      item.sender?.userId?._id || item.sender?.userId || item.sender;
+    const currentUserId = user?._id;
+    const isMe =
+      senderId &&
+      currentUserId &&
+      senderId.toString() === currentUserId.toString();
+
     return (
-      <View style={[styles.messageContainer, isMe ? styles.myMessageContainer : styles.otherMessageContainer]}>
+      <View
+        style={[
+          styles.messageContainer,
+          isMe ? styles.myMessageContainer : styles.otherMessageContainer,
+        ]}
+      >
         <Text style={styles.dateLabel}>
-            {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+          {item.createdAt
+            ? new Date(item.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : ""}
         </Text>
-        <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.otherMessage]}>
-           {item.type === 'text' && (
-             <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-               {item.content?.text || item.text}
-             </Text>
-           )}
-           {item.type === 'image' && (
-             <Image 
-                source={{ uri: item.content?.mediaUrl?.startsWith('http') ? item.content.mediaUrl : `${API_URL}${item.content?.mediaUrl}` }} 
-                style={styles.messageImage} 
-                resizeMode="cover"
-             />
-           )}
+        <View
+          style={[
+            styles.messageBubble,
+            isMe ? styles.myMessage : styles.otherMessage,
+          ]}
+        >
+          {item.type === "text" && (
+            <Text
+              style={[
+                styles.messageText,
+                isMe ? styles.myMessageText : styles.otherMessageText,
+              ]}
+            >
+              {item.content?.text || item.text}
+            </Text>
+          )}
+          {item.type === "image" && (
+            <Image
+              source={{
+                uri: item.content?.mediaUrl?.startsWith("http")
+                  ? item.content.mediaUrl
+                  : `${API_URL}${item.content?.mediaUrl}`,
+              }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          )}
         </View>
       </View>
     );
   };
 
-  // Quick replies data
+  // Predefined property conversation starters
   const quickReplies = [
-    { id: '1', text: 'Lorem Ipsum' },
-    { id: '2', text: 'Lorem Ipsum' },
-    { id: '3', text: '👍' },
-    { id: '4', text: 'OK' },
-    { id: '5', text: '❤️' },
+    { id: "1", text: "One: Is it available?" },
+    { id: "2", text: "Two: Schedule viewing" },
+    { id: "3", text: "Three: Negotiate Price" },
   ];
 
-  const handleQuickReply = (text: string) => {
-    // Send directly or populate input? Image suggests they are buttons.
-    // Let's populate input for now or send directly? 
-    // Usually these are one-tap sends. Let's make them populate input for flexibility,
-    // or if they are "smart replies", they send immediately.
-    // Given the "OK" and emoji, immediate send is often expected 
-    // BUT "Lorem Ipsum" suggests placeholders. I'll make them populate input.
-    setMessageText(text);
+  const handleQuickReply = async (text: string) => {
+    // Immediate send behavior for smooth flow
+    if (threadId) {
+      try {
+        // Expand short label to full text if needed, or send as is. Sending meaningful text.
+        let messageContent = text;
+        if (text === "One: Is it available?")
+          messageContent = "Hi, is this property still available?";
+        if (text === "Two: Schedule viewing")
+          messageContent =
+            "I'm interested in this property. When can I schedule a viewing?";
+        if (text === "Three: Negotiate Price")
+          messageContent = "Is the price negotiable?";
+
+        const newMessage = await chatService.sendMessage(
+          threadId,
+          messageContent,
+        );
+        setMessages((prev) => {
+          if (prev.find((m) => m._id === newMessage._id)) return prev;
+          return [...prev, newMessage];
+        });
+        scrollToBottom();
+      } catch (error) {
+        console.error("Error sending quick reply:", error);
+        Alert.alert("Error", "Failed to send message");
+      }
+    }
   };
 
   return (
@@ -218,20 +276,11 @@ interface Message {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.quickRepliesList}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={[
-                styles.quickReplyChip,
-                (item.text === "👍" || item.text === "❤️") ? styles.quickReplyEmoji : null
-              ]}
+            <TouchableOpacity
+              style={styles.quickReplyChip}
               onPress={() => handleQuickReply(item.text)}
             >
-              {item.text === "👍" ? (
-                 <Text style={{fontSize: 18}}>👍</Text>
-              ) : item.text === "❤️" ? (
-                 <Ionicons name="heart" size={18} color="#FF0000" />
-              ) : (
-                <Text style={styles.quickReplyText}>{item.text}</Text>
-              )}
+              <Text style={styles.quickReplyText}>{item.text}</Text>
             </TouchableOpacity>
           )}
         />
@@ -251,18 +300,18 @@ interface Message {
             onChangeText={setMessageText}
             multiline
           />
-          <TouchableOpacity 
-            style={styles.sendButton} 
+          <TouchableOpacity
+            style={styles.sendButton}
             onPress={handleSend}
             disabled={!messageText.trim()}
           >
             {/* Using Ionicons for send to match style slightly better if icon png is issue, but keeping image as per request */}
-            <Image 
-              source={sendIcon} 
+            <Image
+              source={sendIcon}
               style={[
-                styles.sendIcon, 
-                !messageText.trim() && { tintColor: "#CCC" }
-              ]} 
+                styles.sendIcon,
+                !messageText.trim() && { tintColor: "#CCC" },
+              ]}
             />
           </TouchableOpacity>
         </View>
@@ -400,22 +449,25 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   quickReplyChip: {
-    backgroundColor: "#FFC09F", // Light peach
+    backgroundColor: "#FF8C42", // Primary action color
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
     marginRight: 10,
-    minWidth: 40,
-    alignItems:'center',
-    justifyContent:'center'
+    minWidth: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
-  quickReplyEmoji: {
-    backgroundColor: "#F5F4F8", // Gray for emojis or white
-  },
+  // quickReplyEmoji style removed
   quickReplyText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontFamily: "Raleway-Medium",
+    fontSize: 13,
+    fontFamily: "Raleway-SemiBold",
   },
   heartIcon: {
     fontSize: 20,

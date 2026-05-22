@@ -1,23 +1,16 @@
 import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenLayout, SelectionButton } from "../../components/Ui";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 
 type UserType = "buyer" | "seller" | null;
 
 const SignUpScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [selectedUserType, setSelectedUserType] = useState<UserType>(null);
-  const [locale, setLocale] = useState(i18n.locale);
+  // Removed locale polling, useLanguage handles re-rendering
 
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-    return () => clearInterval(checkLocale);
-  }, [locale]);
 
   const handleBuyerSignUp = () => {
     setSelectedUserType("buyer");
@@ -35,12 +28,14 @@ const SignUpScreen = () => {
         title={t("authentication.buyer")}
         onPress={handleBuyerSignUp}
         variant={selectedUserType === "buyer" ? "primary" : "secondary"}
+        accessibilityLabel="Sign Up as Buyer"
       />
 
       <SelectionButton
         title={t("authentication.seller")}
         onPress={handleSellerSignUp}
         variant={selectedUserType === "seller" ? "primary" : "secondary"}
+        accessibilityLabel="Sign Up as Seller"
       />
     </ScreenLayout>
   );

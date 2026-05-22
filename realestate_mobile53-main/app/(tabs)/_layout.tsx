@@ -1,39 +1,45 @@
 import { Tabs } from "expo-router";
 import { Image } from "react-native";
-import { useState, useEffect } from "react";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 import { useInterest } from "../../contexts/InterestContext";
+import OfferIcon from "../../components/Ui/OfferIcon";
 
 export default function TabLayout() {
-  const [locale, setLocale] = useState(i18n.locale);
-  const { userInterest, isPropertyMode } = useInterest();
-
-  // Listen for language changes
-  useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-
-    return () => clearInterval(checkLocale);
-  }, [locale]);
+  const { t, currentLanguage } = useTranslation();
+  const { userInterest } = useInterest();
 
   return (
     <Tabs
-      key={`${locale}-${userInterest}`} // Force re-render when locale or interest changes
+      key={`${currentLanguage}-${userInterest}`} // Force re-render when locale or interest changes
       screenOptions={{
         tabBarActiveTintColor: "#FF8C42",
         tabBarInactiveTintColor: "#A0A0A0",
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#F8F7F3CB",
+          position: "absolute",
+          left: 16,
+          right: 16,
+          bottom: 16,
+          backgroundColor: "#fff",
+          borderRadius: 28,
           borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 80,
-          paddingBottom: 8,
-          paddingTop: 8,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 10,
+        },
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
+          marginBottom: 4,
+        },
+        tabBarItemStyle: {
+          marginHorizontal: 4,
         },
       }}
     >
@@ -55,11 +61,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="my-offers"
+        options={{
+          title: t("navigation.offers") || "Offers",
+          tabBarIcon: ({ focused }) => (
+            <OfferIcon color={focused ? "#FF8C42" : "#A0A0A0"} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="Explore"
         options={{
-          title: isPropertyMode
-            ? t("navigation.explore")
-            : t("navigation.browse_cars"),
+          title: t("navigation.explore"),
           tabBarIcon: ({ focused }) => (
             <Image
               source={
@@ -78,28 +91,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="Settings"
-        options={{
-          title: t("navigation.settings"),
-          tabBarIcon: ({ focused }) => (
-            <Image
-              source={require("../../assets/Icons/Vector.png")}
-              style={{
-                width: 24,
-                height: 24,
-                tintColor: focused ? "#FF8C42" : "#A0A0A0",
-              }}
-              resizeMode="contain"
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="Bookings"
         options={{
-          title: isPropertyMode
-            ? t("navigation.bookings")
-            : t("navigation.test_drives"),
+          title: t("navigation.bookings"),
           tabBarIcon: ({ focused }) => (
             <Image
               source={
@@ -114,6 +108,12 @@ export default function TabLayout() {
               resizeMode="contain"
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="Settings"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

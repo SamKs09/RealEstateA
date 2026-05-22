@@ -1,0 +1,19 @@
+# Onboarding Images Directory
+
+This directory contains hero images for the onboarding screens.
+
+## Required Images:
+1. **house-icon.png** - 3D house illustration for Screen 1 (Splash/Welcome)
+2. **handshake.png** - Business handshake photo for Screen 2 (Connect & Close Deals)
+3. **bmw-car.png** - White BMW on scenic road for Screen 3 (Buy or Rent Vehicles)
+4. **house.png** - Beautiful house with palm trees for Screen 4 (Find Your Perfect Home)
+
+## Image Specifications:
+- Format: PNG or WebP
+- Dimensions: 1080x1080px (1:1 aspect ratio)
+- File size: < 500KB per image
+- Color space: sRGB
+- Optimization: Compressed for mobile
+
+## Temporary Placeholder:
+Until actual images are provided, the app will use the existing placeholder.png from the parent images directory.

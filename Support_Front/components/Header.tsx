@@ -33,8 +33,12 @@ export default function Header({ onShowStats }: HeaderProps) {
             <span className="text-2xl">🏠</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Support Dashboard</h1>
-            <p className="text-xs text-gray-500">Real Estate Messaging System</p>
+            <h1 className="text-xl font-bold text-gray-800">
+              Support Dashboard
+            </h1>
+            <p className="text-xs text-gray-500">
+              Real Estate Messaging System
+            </p>
           </div>
         </div>
 
@@ -55,35 +59,7 @@ export default function Header({ onShowStats }: HeaderProps) {
       </div>
 
       <div className="flex items-center space-x-4">
-        <button
-          onClick={onShowStats}
-          className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <FiBarChart2 />
-          <span className="text-sm font-medium">Statistics</span>
-        </button>
-
-        <div className="flex items-center space-x-3 px-4 py-2 bg-gray-50 rounded-lg">
-          <div className="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold">
-            {user?.fullName?.charAt(0) || "A"}
-          </div>
-          <div className="text-sm">
-            <p className="font-medium text-gray-800">
-              {user?.fullName || "Admin"}
-            </p>
-            <p className="text-xs text-gray-500 capitalize">
-              {user?.role?.[0] || "Support"}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleLogout}
-          className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <FiLogOut />
-          <span className="text-sm font-medium">Logout</span>
-        </button>
+        {/* Removed Statistics, User Profile, and Logout - now in Sidebar */}
       </div>
     </header>
   );

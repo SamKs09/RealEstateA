@@ -61,7 +61,10 @@ export default function LoginPage() {
       {/* Background gradient effects */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"
+          style={{ animationDelay: "2s" }}
+        ></div>
       </div>
 
       <div className="relative bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8 border border-gray-700">
@@ -139,9 +142,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-500 text-xs">
-            Support & Admin access only
-          </p>
+          <p className="text-gray-500 text-xs">Support & Admin access only</p>
         </div>
       </div>
     </div>

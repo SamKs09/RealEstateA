@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { API_URL } from './api';
 
 export async function sendPushTokenToBackend(token: string, userId: string) {
   try {
-    await axios.post('http://localhost:3000/api/push/register', {
+    await axios.post(`${API_URL}/push/register`, {
       token,
       userId,
     });

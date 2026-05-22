@@ -49,6 +49,10 @@ export default i18n;
 // Helper functions
 export const getCurrentLanguage = () => i18n.locale;
 
+export const getCurrentLanguageInfo = () => {
+  return supportedLanguages.find(lang => lang.code === i18n.locale) || supportedLanguages[0];
+};
+
 export const setLanguage = (locale: string) => {
   if (supportedLanguages.find(lang => lang.code === locale)) {
     i18n.locale = locale;

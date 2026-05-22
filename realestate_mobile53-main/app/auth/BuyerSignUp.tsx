@@ -20,7 +20,7 @@ import {
 import { Colors } from "../../components/styles";
 import { useAuth } from "../../contexts/AuthContext";
 import { useInterest } from "../../contexts/InterestContext";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface FormData {
   fullName: string;
@@ -45,6 +45,7 @@ const BuyerSignUpScreen = () => {
   const { interest } = useLocalSearchParams<{ interest: string }>();
   const { registerPhone, isLoading, clearError } = useAuth();
   const { setUserPreferences } = useInterest();
+  const { t } = useTranslation();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("signup");
   const [formData, setFormData] = useState<FormData>({
@@ -56,16 +57,7 @@ const BuyerSignUpScreen = () => {
     city: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [locale, setLocale] = useState(i18n.locale);
-
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-    return () => clearInterval(checkLocale);
-  }, [locale]);
+  // Removed locale polling, useLanguage handles re-rendering
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -93,7 +85,7 @@ const BuyerSignUpScreen = () => {
 
     if (!formData.password) {
       newErrors.password = t("validation.passwordRequired");
-    } else if (formData.password.length < 6) {
+    } else if (formData.password.length < 8) {
       newErrors.password = t("validation.passwordTooShort");
     }
 
@@ -122,8 +114,8 @@ const BuyerSignUpScreen = () => {
         });
 
         // Save user interest and role using InterestContext
-        const userInterest = (interest || "property") as "property" | "cars";
-        const userRole = interest === "cars" ? "buyer" : "renter"; // buyer for cars, renter for property
+        const userInterest = (interest || "property") as "property" | "cars" | "both";
+        const userRole = "buyer";
         await setUserPreferences(userInterest, userRole);
 
         const result = await registerPhone({
@@ -218,6 +210,8 @@ const BuyerSignUpScreen = () => {
             onChangeText={(value) => updateFormData("fullName", value)}
             placeholder={t("authentication.enterFullName")}
             error={errors.fullName}
+            important
+            accessibilityLabel="Full Name Input"
           />
 
           <FloatingLabelInput
@@ -228,6 +222,8 @@ const BuyerSignUpScreen = () => {
             keyboardType="email-address"
             autoCapitalize="none"
             error={errors.email}
+            important
+            accessibilityLabel="Email Input"
           />
 
           <FloatingLabelInput
@@ -237,6 +233,8 @@ const BuyerSignUpScreen = () => {
             placeholder={t("authentication.enterPhoneNumber")}
             keyboardType="phone-pad"
             error={errors.phoneNumber}
+            important
+            accessibilityLabel="Phone Number Input"
           />
 
           <FloatingLabelInput
@@ -245,6 +243,8 @@ const BuyerSignUpScreen = () => {
             onChangeText={(value) => updateFormData("city", value)}
             placeholder={t("authentication.enterCity")}
             error={errors.city}
+            important
+            accessibilityLabel="City Input"
           />
 
           <FloatingLabelInput
@@ -257,6 +257,8 @@ const BuyerSignUpScreen = () => {
             passwordVisible={passwordVisible}
             onPasswordToggle={() => setPasswordVisible(!passwordVisible)}
             error={errors.password}
+            important
+            accessibilityLabel="Password Input"
           />
 
           <FloatingLabelInput
@@ -266,6 +268,8 @@ const BuyerSignUpScreen = () => {
             placeholder={t("authentication.confirmYourPassword")}
             secureTextEntry={!passwordVisible}
             error={errors.confirmPassword}
+            important
+            accessibilityLabel="Confirm Password Input"
           />
 
           <PrimaryButton
@@ -277,6 +281,7 @@ const BuyerSignUpScreen = () => {
             onPress={handleSignUp}
             disabled={isLoading}
             style={styles.signUpButton}
+            accessibilityLabel="Sign Up Button"
           />
 
           <FormSeparator />
@@ -285,14 +290,18 @@ const BuyerSignUpScreen = () => {
             title={t("authentication.google")}
             onPress={handleGoogleSignUp}
             icon={require("../../assets/images/Auth/Google.png")}
-            style={styles.socialButton}
+            style={[styles.socialButton, { opacity: 0.6 }]}
+            disabled={true}
+            accessibilityLabel="Google Sign Up (Coming Soon)"
           />
 
           <SecondaryButton
             title={t("authentication.apple")}
             onPress={handleAppleSignUp}
             icon={require("../../assets/images/Auth/Apple_Logo.png")}
-            style={styles.socialButton}
+            style={[styles.socialButton, { opacity: 0.6 }]}
+            disabled={true}
+            accessibilityLabel="Apple Sign Up (Coming Soon)"
           />
         </View>
       </ScrollView>

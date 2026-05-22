@@ -24,7 +24,7 @@ const messageSchema = new Schema(
       },
       role: {
         type: String,
-        enum: ["user", "support", "admin"],
+         enum: ["user", "owner", "support", "admin"],
         default: "user",
       },
     },

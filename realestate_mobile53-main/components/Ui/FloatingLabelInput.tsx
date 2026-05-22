@@ -25,6 +25,8 @@ interface FloatingLabelInputProps {
   error?: string;
   style?: ViewStyle;
   placeholderTextColor?: string;
+  important?: boolean;
+  accessibilityLabel?: string;
 }
 
 const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
@@ -41,6 +43,8 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
   error,
   style,
   placeholderTextColor = Colors.textLight,
+  important = false,
+  accessibilityLabel,
 }) => {
   return (
     <View style={[styles.container, style]}>
@@ -54,6 +58,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
           ]}
         >
           {label}
+          {important && <Text style={{ color: "red" }}> *</Text>}
         </Text>
         {showPasswordToggle ? (
           <View style={styles.passwordInputRow}>
@@ -69,6 +74,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
               autoCapitalize={autoCapitalize}
               secureTextEntry={secureTextEntry && !passwordVisible}
               placeholderTextColor={placeholderTextColor}
+              accessibilityLabel={accessibilityLabel}
             />
             <TouchableOpacity
               onPress={onPasswordToggle}
@@ -94,6 +100,7 @@ const FloatingLabelInput: React.FC<FloatingLabelInputProps> = ({
             autoCapitalize={autoCapitalize}
             secureTextEntry={secureTextEntry}
             placeholderTextColor={placeholderTextColor}
+            accessibilityLabel={accessibilityLabel}
           />
         )}
       </View>

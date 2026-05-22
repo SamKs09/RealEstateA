@@ -4,6 +4,7 @@ export { default as authService } from './authService';
 export { default as userService } from './userService';
 export { default as propertyService } from './propertyService';
 export * as vehicleService from './vehicleService';
+export { default as sellerService } from './sellerService';
 
 // Export types
 export type { ApiResponse, ApiError } from './api';
@@ -46,3 +47,16 @@ export type {
   VehicleLocation,
   VehiclePricing,
 } from './vehicleService';
+
+export type {
+  SellerProfile,
+  SellerListing,
+  SellerListingsResponse,
+  Review,
+  ReviewsResponse,
+  RatingResponse,
+  ReviewableItem,
+  FollowStatusResponse,
+  FollowStatsResponse,
+  CreateReviewRequest,
+} from './sellerService';

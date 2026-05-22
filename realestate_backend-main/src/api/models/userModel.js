@@ -1,3 +1,4 @@
+
 const { Schema } = require("mongoose");
 const mongoose = require("mongoose");
 
@@ -50,14 +51,17 @@ const userSchema = new Schema(
     avatar: {
       type: String,
     },
+    city: {
+      type: String,
+    },
     role: {
-      type: [String],
-      enum: ['buyer', 'seller', 'support', 'admin'],
-      default: ['buyer']
+      type: String,
+      enum: ['client', 'seller', 'renter', 'support', 'admin'],
+      default: 'client'
     },
     interest: {
       type: String,
-      enum: ['property', 'cars'],
+      enum: ['property', 'cars', 'both'],
       default: 'property'
     },
     preferences: {
@@ -86,6 +90,38 @@ const userSchema = new Schema(
       email: { type: Boolean, default: false },    // you already have emailVerified, can keep or remove old one
       phone: { type: Boolean, default: false },    // same for phoneVerified
       identity: { type: Boolean, default: false }
+    },
+    sellerVerification: {
+      documentType: {
+        type: String,
+        enum: ['cin', 'passport'],
+        default: 'cin'
+      },
+      identityFront: {
+        type: String,
+      },
+      identityBack: {
+        type: String,
+      },
+      faceVideo: {
+        type: String,
+      },
+      status: {
+        type: String,
+        enum: ['not_submitted', 'pending', 'approved', 'rejected'],
+        default: 'not_submitted'
+      },
+      submittedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+      notes: {
+        type: String,
+      }
     },
     rating: {
       average: { type: Number, default: 0 },
@@ -120,6 +156,34 @@ const userSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Vehicle',
       index: true
+    }],
+
+    pack: {
+      type: String,
+      enum: ['freemium', 'bronze', 'silver', 'gold', 'platinum'],
+      default: 'freemium'
+    },
+
+    listingConfig: {
+      status: { type: Boolean, default: true },
+      number: { type: Number, default: 1 }, 
+
+    },
+        
+    boost: {
+      status: { type: Boolean, default: false }, 
+      number: { type: Number, default: 0 } 
+    },
+    trial: {
+      isUsed: { type: Boolean, default: false },
+      startDate: { type: Date },
+      endDate: { type: Date },
+      status: { type: String, enum: ['none', 'active', 'expired'], default: 'none' }
+    },
+    pushTokens: [{
+      token: String,
+      platform: String,
+      createdAt: { type: Date, default: Date.now }
     }]
   },
   { versionKey: false, timestamps: true }
@@ -136,5 +200,16 @@ userSchema.virtual('favoritesCount').get(function () {
 // Ensure virtual fields are serialized
 userSchema.set('toJSON', { virtuals: true });
 userSchema.set('toObject', { virtuals: true });
+
+// Pre-save hook to sanitize role (fix for legacy array/buyer issue)
+userSchema.pre('save', function(next) {
+  if (Array.isArray(this.role)) {
+    this.role = this.role[0] === 'buyer' ? 'client' : this.role[0];
+  }
+  if (this.role === 'buyer') {
+    this.role = 'client';
+  }
+  next();
+});
 
 module.exports = mongoose.model("User", userSchema);

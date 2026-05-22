@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface CalendarPickerProps {
   selectedStartDate: number;
@@ -10,6 +11,8 @@ interface CalendarPickerProps {
   onDateSelect: (date: number) => void;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
+  /** Return true to mark a day as unavailable (dimmed, non-selectable) */
+  disabledDates?: (date: number) => boolean;
 }
 
 const CalendarPicker: React.FC<CalendarPickerProps> = ({
@@ -20,20 +23,23 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
   onDateSelect,
   onPreviousMonth,
   onNextMonth,
+  disabledDates,
 }) => {
+  const { t } = useTranslation();
+
   const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    t("bookings.january"),
+    t("bookings.february"),
+    t("bookings.march"),
+    t("bookings.april"),
+    t("bookings.may"),
+    t("bookings.june"),
+    t("bookings.july"),
+    t("bookings.august"),
+    t("bookings.september"),
+    t("bookings.october"),
+    t("bookings.november"),
+    t("bookings.december"),
   ];
 
   const getDaysInMonth = (month: number, year: number) => {
@@ -55,12 +61,13 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
       cells.push(
         <View key={`empty-${i}`} style={styles.dateCell}>
           <Text style={styles.inactiveDateText}></Text>
-        </View>
+        </View>,
       );
     }
 
     // Add cells for actual days of the month
     for (let day = 1; day <= daysInMonth; day++) {
+      const isDisabled = disabledDates ? disabledDates(day) : false;
       const isStartDate = selectedStartDate === day;
       const isEndDate = selectedEndDate === day;
       const isInRange =
@@ -74,7 +81,10 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
       let cellStyle: any = styles.dateCell;
       let textStyle: any = styles.dateText;
 
-      if (isSelected) {
+      if (isDisabled) {
+        cellStyle = [styles.dateCell, styles.disabledDate];
+        textStyle = [styles.dateText, styles.disabledDateText];
+      } else if (isSelected) {
         cellStyle = [styles.dateCell, styles.selectedDate];
         textStyle = [styles.dateText, styles.selectedDateText];
       } else if (isInRange) {
@@ -86,10 +96,12 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
         <TouchableOpacity
           key={day}
           style={cellStyle}
-          onPress={() => onDateSelect(day)}
+          onPress={() => !isDisabled && onDateSelect(day)}
+          disabled={isDisabled}
+          activeOpacity={isDisabled ? 1 : 0.7}
         >
           <Text style={textStyle}>{day}</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>,
       );
     }
 
@@ -99,7 +111,7 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
       cells.push(
         <View key={`empty-end-${i}`} style={styles.dateCell}>
           <Text style={styles.inactiveDateText}></Text>
-        </View>
+        </View>,
       );
     }
 
@@ -124,7 +136,15 @@ const CalendarPicker: React.FC<CalendarPickerProps> = ({
 
       {/* Days of Week */}
       <View style={styles.daysOfWeek}>
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+        {[
+          t("bookings.sun"),
+          t("bookings.mon"),
+          t("bookings.tue"),
+          t("bookings.wed"),
+          t("bookings.thu"),
+          t("bookings.fri"),
+          t("bookings.sat"),
+        ].map((day) => (
           <Text key={day} style={styles.dayLabel}>
             {day}
           </Text>
@@ -172,7 +192,7 @@ const styles = StyleSheet.create({
   yearText: {
     fontSize: 18,
     fontWeight: "bold",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
     color: "#333333",
   },
   daysOfWeek: {
@@ -206,7 +226,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333333",
     fontWeight: "500",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
   selectedDate: {
     backgroundColor: "#FF8C42",
@@ -227,11 +247,18 @@ const styles = StyleSheet.create({
   selectedDateText: {
     color: "#FFFFFF",
     fontWeight: "bold",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
   },
   inactiveDateText: {
     color: "#CCCCCC",
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
+  },
+  disabledDate: {
+    opacity: 0.3,
+  },
+  disabledDateText: {
+    color: "#999999",
+    textDecorationLine: "line-through",
   },
 });
 

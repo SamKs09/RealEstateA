@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 
 interface BookingCardProps {
   propertyName: string;
@@ -23,6 +23,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onStatusPress,
   style,
 }) => {
+  const { t } = useTranslation();
+  
   return (
     <TouchableOpacity
       style={[styles.bookingCard, style]}
@@ -42,7 +44,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
         </Text>
 
         <View style={styles.priceSection}>
-          <Text style={[styles.price, { fontFamily: "comfortaa-500Medium" }]}>
+          <Text style={[styles.price, { fontFamily: "raleway-500Medium" }]}>
             {price}
           </Text>
           <Text
@@ -110,7 +112,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 
 const styles = StyleSheet.create({
   bookingCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#F8F9FA",
     borderRadius: 20,
     marginBottom: 20,
     shadowColor: "#000",

@@ -51,6 +51,9 @@ export interface Vehicle extends CreateVehicleData {
   _id?: string;
   id?: string;
   owner: string;
+  isPromoted?: boolean;
+  promotionExpiry?: string | null;
+  boostPlan?: "1day" | "3day" | "7day" | null;
   media: {
     images: string[];
     videos: string[];
@@ -158,13 +161,15 @@ export const getUserVehicles = async (params?: {
       total: number;
       pages: number;
     }>(`/vehicles/my-vehicles?${queryParams.toString()}`);
-    
+
+    console.log('🚗 getUserVehicles response:', JSON.stringify(response, null, 2));
+
     return {
       success: response.success,
-      data: response.data?.data || [],
-      count: response.data?.count || 0,
-      total: response.data?.total || 0,
-      pages: response.data?.pages || 0,
+      data: (response as any).data || [],  // Backend returns data directly, not nested
+      count: (response as any).count || 0,
+      total: (response as any).total || 0,
+      pages: (response as any).pages || 0,
     };
   } catch (error: any) {
     console.error("❌ Error fetching user vehicles:", error);
@@ -190,6 +195,44 @@ export const getVehicle = async (
   }
 };
 
+export const boostVehicle = async (
+  vehicleId: string,
+  boostPlan: "1day" | "3day" | "7day"
+): Promise<{
+  vehicle: Vehicle;
+  boost: { plan: string; label: string; expiryDate: string; cost: number };
+  user?: any;
+}> => {
+  try {
+    const response = await apiService.post<any>(`/vehicles/${vehicleId}/boost`, { boostPlan });
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ Error boosting vehicle:", error);
+    throw error;
+  }
+};
+
+export const initiateVehicleBoostPayment = async (
+  vehicleId: string,
+  boostPlan: "1day" | "3day" | "7day"
+): Promise<{
+  transactionId: string;
+  kind: "vehicle_boost";
+  status: string;
+  amount: number;
+  currency: string;
+  boostPlan: string;
+  checkoutUrl?: string | null;
+}> => {
+  try {
+    const response = await apiService.post<any>(`/payments/vehicles/${vehicleId}/initiate-boost`, { boostPlan });
+    return response.data as any;
+  } catch (error: any) {
+    console.error("❌ Error initiating vehicle boost payment:", error);
+    throw error;
+  }
+};
+
 /**
  * Search vehicles
  */
@@ -205,6 +248,8 @@ export const searchVehicles = async (filters?: {
   transmission?: string;
   location?: string;
   keyword?: string;
+  listingType?: string;
+  status?: string;
   page?: number;
   limit?: number;
 }): Promise<{
@@ -230,13 +275,15 @@ export const searchVehicles = async (filters?: {
       total: number;
       pages: number;
     }>(`/vehicles/search?${queryParams.toString()}`);
-    
+
+    console.log('🔍 searchVehicles response:', JSON.stringify(response, null, 2));
+
     return {
       success: response.success,
-      data: response.data?.data || [],
-      count: response.data?.count || 0,
-      total: response.data?.total || 0,
-      pages: response.data?.pages || 0,
+      data: (response as any).data || [],  // Backend returns data directly, not nested
+      count: (response as any).count || 0,
+      total: (response as any).total || 0,
+      pages: (response as any).pages || 0,
     };
   } catch (error: any) {
     console.error("❌ Error searching vehicles:", error);
@@ -280,3 +327,4 @@ export const deleteVehicle = async (
     throw error;
   }
 };
+

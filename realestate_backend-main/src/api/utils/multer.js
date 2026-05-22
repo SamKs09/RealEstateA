@@ -61,7 +61,7 @@ const storage = multer.diskStorage({
 
     // Support both avatar and property media fieldnames
     if (file.fieldname === "avatar") {
-      uploadPath = path.join(__dirname, "/images-users");
+      uploadPath = path.join(process.cwd(), "images-users");
     } else if (file.fieldname === "images") {
       uploadPath = path.join(__dirname, "../uploads/properties/images");
     } else if (file.fieldname === "videos") {
@@ -72,6 +72,9 @@ const storage = multer.diskStorage({
       uploadPath = path.join(__dirname, "../uploads/properties/virtualTour");
     } else if (file.fieldname === "attachments") {
       uploadPath = path.join(__dirname, "../uploads/support/attachments");
+    } else if (file.fieldname === "media") {
+      // Vehicle media uploads
+      uploadPath = path.join(__dirname, "../uploads/vehicles/images");
     } else {
       return cb(new Error("Invalid upload field"), false);
     }
@@ -127,6 +130,16 @@ const upload = multer({
       }
       
       console.log('✅ Accepted attachment:', file.originalname);
+      return cb(null, true);
+    }
+    if (file.fieldname === "media") {
+      // Vehicle media uploads - accept images
+      const allowedTypes = /\.(jfif|jpg|jpeg|png|gif|webp)$/i;
+      if (!allowedTypes.test(file.originalname)) {
+        console.log('❌ Rejected vehicle media - invalid type:', file.originalname);
+        return cb(new Error("Only image files are allowed for vehicle media!"), false);
+      }
+      console.log('✅ Accepted vehicle media:', file.originalname);
       return cb(null, true);
     }
     return imageFileFilter(req, file, cb);

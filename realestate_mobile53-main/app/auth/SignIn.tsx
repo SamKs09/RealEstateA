@@ -1,13 +1,12 @@
 ﻿import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
-import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   Image,
-  Alert,
 } from "react-native";
 import {
   PrimaryButton,
@@ -20,11 +19,13 @@ import {
 // FIX: Import Colors and Typography from GlobalStyles
 import { Colors, Typography } from "../../components/styles/GlobalStyles";
 import { useAuth } from "../../contexts/AuthContext";
+import { usePopup } from "../../contexts/PopupContext";
 
 const SignInScreen = () => {
   const router = useRouter();
   const { login, isLoading, clearError } = useAuth();
-  const { t, changeLanguage, currentLanguage } = useLanguage();
+  const { t, currentLanguage } = useTranslation();
+  const { showError } = usePopup();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +46,7 @@ const SignInScreen = () => {
 
     if (!password) {
       newErrors.password = t("authentication.passwordRequired");
-    } else if (password.length < 6) {
+    } else if (password.length < 8) {
       newErrors.password = t("authentication.passwordMinLength");
     }
 
@@ -66,10 +67,8 @@ const SignInScreen = () => {
         router.replace("../(tabs)/Explore"); // Navigate to main app
       } catch (err: any) {
         console.error("❌ Login error caught:", err);
-        Alert.alert(
-          "Login Failed",
-          err.message || "An error occurred during login"
-        );
+        console.error("❌ Login error caught:", err);
+        showError(err.message || "An error occurred during login");
       }
     }
   };
@@ -136,6 +135,8 @@ const SignInScreen = () => {
           keyboardType="email-address"
           autoCapitalize="none"
           error={errors.email}
+          important
+          accessibilityLabel="Email Input"
         />
 
         {/* Password Input - Compact with Floating Label */}
@@ -149,6 +150,8 @@ const SignInScreen = () => {
           passwordVisible={passwordVisible}
           onPasswordToggle={() => setPasswordVisible(!passwordVisible)}
           error={errors.password}
+          important
+          accessibilityLabel="Password Input"
         />
 
         {/* Forgot Password - Compact */}
@@ -171,6 +174,7 @@ const SignInScreen = () => {
           onPress={handleSignIn}
           disabled={isLoading}
           style={styles.compactLoginButton}
+          accessibilityLabel="Login Button"
         />
 
         {/* Or Separator - Compact */}

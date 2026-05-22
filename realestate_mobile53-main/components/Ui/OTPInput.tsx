@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     fontSize: 18,
     fontWeight: "600",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-600SemiBold",
     marginHorizontal: 8,
   },
   inputEmpty: {

@@ -3,10 +3,51 @@ import React, {
   useContext,
   useReducer,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 import { authService, User } from "../services/authService";
+import { userService } from "../services/userService";
+import { API_CONFIG } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+
+function isAndroidExpoGoRuntime() {
+  return (
+    Platform.OS === "android" &&
+    (Constants.appOwnership === "expo" ||
+      Constants.executionEnvironment === "storeClient")
+  );
+}
+
+/**
+ * Run post-login side effects: register the Expo push token with the backend
+ * and establish the socket connection so real-time notifications work immediately.
+ * Errors are swallowed – they must never block the login flow.
+ */
+async function runPostLoginSetup(): Promise<void> {
+  if (!isAndroidExpoGoRuntime()) {
+    try {
+      const { notificationService } = await import("../services/notificationService");
+      await notificationService.syncPushToken();
+      // Retroactively create DB notifications for any pending bookings the seller
+      // owns that were created before the notification pipeline was fixed.
+      await notificationService.syncBookingNotifications();
+      // Refresh badge + trigger re-fetch on all mounted screens.
+      await notificationService.refresh();
+    } catch (e) {
+      console.warn("⚠️ Post-login notification setup failed:", e);
+    }
+  }
+
+  try {
+    const { chatService } = await import("../services/chatService");
+    await chatService.initialize();
+  } catch (e) {
+    console.warn("⚠️ Post-login socket setup failed:", e);
+  }
+}
 
 // Auth State Types
 interface AuthState {
@@ -44,7 +85,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case "AUTH_SUCCESS":
       return {
         ...state,
-        user: action.payload,
+        user: sanitizeUserProfile(action.payload),
         isAuthenticated: true,
         isLoading: false,
         error: null,
@@ -107,19 +148,60 @@ interface AuthContextType extends AuthState {
   resetPasswordEmail: (
     token: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
   ) => Promise<void>;
   resetPasswordPhone: (
     phoneNumber: string,
     otp: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
   ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  updateUser: (user: any) => void;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const normalizeImageUrl = (value?: string | null): string | undefined => {
+  if (!value || typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("file://") ||
+    trimmed.startsWith("content://")
+  ) {
+    return trimmed;
+  }
+  const baseUrl = API_CONFIG.BASE_URL.replace(/\/api\/?$/, "");
+  if (trimmed.startsWith("/")) {
+    return `${baseUrl}${trimmed}`;
+  }
+  return `${baseUrl}/${trimmed}`;
+};
+
+const sanitizeUserProfile = (user: any) => {
+  if (!user) return user;
+  const sanitized = { ...user } as any;
+
+  if (sanitized.avatar === "") delete sanitized.avatar;
+  if (sanitized.profileImage === "") delete sanitized.profileImage;
+
+  if (!sanitized.avatar && sanitized.profileImage) {
+    sanitized.avatar = sanitized.profileImage;
+  }
+
+  const normalizedAvatar = normalizeImageUrl(sanitized.avatar);
+  if (normalizedAvatar) {
+    sanitized.avatar = normalizedAvatar;
+    sanitized.profileImage = normalizedAvatar;
+  }
+
+  return sanitized;
+};
 
 // Auth Provider Props
 interface AuthProviderProps {
@@ -139,6 +221,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (user) {
           dispatch({ type: "AUTH_SUCCESS", payload: user });
+          runPostLoginSetup();
         } else {
           dispatch({ type: "AUTH_LOGOUT" });
         }
@@ -169,13 +252,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Standard format: { success: true, data: { user, token } }
           console.log(
             "✅ AuthContext: Login successful (standard format), updating state with user:",
-            response.data.user
+            response.data.user,
           );
           dispatch({ type: "AUTH_SUCCESS", payload: response.data.user });
+          runPostLoginSetup();
         } else if (response.access_token) {
           // Your backend format: { success: true, access_token: "...", user: {...} }
           console.log(
-            "✅ AuthContext: Login successful (backend format), access_token received"
+            "✅ AuthContext: Login successful (backend format), access_token received",
           );
 
           // Save user interest and role if available
@@ -192,14 +276,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             // Save role to AsyncStorage if available
-            if (user.role && user.role.length > 0) {
-              await AsyncStorage.setItem("userRole", user.role[0]);
+            const roleValue = Array.isArray(user.role) ? user.role[0] : user.role;
+            if (roleValue) {
+              await AsyncStorage.setItem("userRole", roleValue === 'client' ? 'buyer' : roleValue);
             }
 
             dispatch({ type: "AUTH_SUCCESS", payload: user });
+            runPostLoginSetup();
           } else {
             // Fallback for old response format
             const tempUser = {
+              pack: "freemium",
+              listingConfig: { status: true, number: 1 },
+              boost: { status: false, number: 0 },
+              trial: null,
               _id: "temp-id",
               email: email,
               userType: "buyer" as const,
@@ -212,14 +302,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           console.error(
             "❌ AuthContext: Login failed - success=true but no data or access_token:",
-            response
+            response,
           );
           throw new Error("Login response missing required data");
         }
       } else {
         console.error(
           "❌ AuthContext: Login failed - success=false:",
-          response
+          response,
         );
         throw new Error(response.message || "Login failed");
       }
@@ -236,7 +326,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Login with phone
   const loginPhone = async (
     phoneNumber: string,
-    password: string
+    password: string,
   ): Promise<void> => {
     try {
       dispatch({ type: "AUTH_LOADING" });
@@ -253,11 +343,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         // Save role to AsyncStorage if available
-        if (user.role && user.role.length > 0) {
-          await AsyncStorage.setItem("userRole", user.role[0]);
+        const roleValue = Array.isArray(user.role) ? user.role[0] : user.role;
+        if (roleValue) {
+          await AsyncStorage.setItem("userRole", roleValue === 'client' ? 'buyer' : roleValue);
         }
 
         dispatch({ type: "AUTH_SUCCESS", payload: user });
+        runPostLoginSetup();
       } else {
         throw new Error(response.message || "Phone login failed");
       }
@@ -380,7 +472,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!response.success) {
         throw new Error(
-          response.message || "Failed to send password reset email"
+          response.message || "Failed to send password reset email",
         );
       }
     } catch (error: any) {
@@ -399,7 +491,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!response.success) {
         throw new Error(
-          response.message || "Failed to send password reset SMS"
+          response.message || "Failed to send password reset SMS",
         );
       }
     } catch (error: any) {
@@ -415,12 +507,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const resetPasswordEmail = async (
     token: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
   ): Promise<void> => {
     try {
       const response = await authService.resetPasswordEmail({
-        token,
-        password,
+        email: "", // We might need to pass email here if backend requires it, or token might be enough
+        otp: token,
+        newPassword: password,
         confirmPassword,
       });
 
@@ -441,13 +534,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     phoneNumber: string,
     otp: string,
     password: string,
-    confirmPassword: string
+    confirmPassword: string,
   ): Promise<void> => {
     try {
       const response = await authService.resetPasswordPhone({
         phoneNumber,
-        otp,
-        password,
+        code: otp,
+        newPassword: password,
         confirmPassword,
       });
 
@@ -473,7 +566,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Clear all session data from AsyncStorage
       console.log(
-        "🧹 Clearing all session data: userInterest, userRole, auth_token, user_data"
+        "🧹 Clearing all session data: userInterest, userRole, auth_token, user_data",
       );
       await AsyncStorage.multiRemove([
         "userInterest",
@@ -487,13 +580,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log("✅ Logout successful - all session data cleared");
       console.log(
-        "📊 Session cleared: authentication token, user data, role, and personalized preferences"
+        "📊 Session cleared: authentication token, user data, role, and personalized preferences",
       );
     } catch {
       // Even if logout API fails, clear local data
       // This is expected if token is expired/invalid
       console.log(
-        "⚠️ Backend logout failed (expected if token expired), clearing local data anyway"
+        "⚠️ Backend logout failed (expected if token expired), clearing local data anyway",
       );
       await AsyncStorage.multiRemove([
         "userInterest",
@@ -511,6 +604,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: "CLEAR_ERROR" });
   };
 
+  const updateUser = useCallback(async (newUser: any) => {
+    try {
+      console.log("🔄 AuthContext: Updating user data...", newUser);
+
+      // Merge with existing user data to avoid losing fields like 'credits'
+      // that might not be in the profile update response
+      const normalizedNewUser = sanitizeUserProfile(newUser);
+      const updatedUser = state.user
+        ? sanitizeUserProfile({ ...state.user, ...normalizedNewUser })
+        : normalizedNewUser;
+
+      // 1. Update In-Memory State
+      dispatch({ type: "AUTH_SUCCESS", payload: updatedUser });
+
+      // 2. Persist to AsyncStorage
+      await AsyncStorage.setItem("user_data", JSON.stringify(updatedUser));
+      console.log("✅ AuthContext: User data merged and persisted to storage");
+    } catch (error) {
+      console.error("❌ AuthContext: Error persisting user data:", error);
+    }
+  }, [state.user]);
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      console.log("🔄 AuthContext: Refreshing user profile from backend...");
+      const response = await userService.getUserProfile();
+      if (response.success && response.data) {
+        await updateUser(response.data);
+      }
+    } catch (error) {
+      console.error("❌ AuthContext: Error refreshing profile:", error);
+    }
+  }, [updateUser]);
+
   const value: AuthContextType = {
     ...state,
     login,
@@ -525,6 +652,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resetPasswordPhone,
     logout,
     clearError,
+    updateUser,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

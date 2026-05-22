@@ -30,14 +30,13 @@ export const Colors = {
 
 
 export const Typography = {
-  numberFontFamily: {
-    regular: 'comfortaa-400Regular',
-    medioum: 'comfortaa-500Medium',
-  },
-
   fontFamily: {
+    light: 'raleway-300Light',
     regular: 'raleway-400Regular',
-    medium: 'raleway-500Medium'
+    medium: 'raleway-500Medium',
+    semibold: 'raleway-600SemiBold',
+    bold: 'raleway-700Bold',
+    extrabold: 'raleway-800ExtraBold',
   },
   fontSize: {
     xs: 12,
@@ -51,10 +50,12 @@ export const Typography = {
   },
  
   fontWeight: {
+    light: '300' as const,
     normal: '400' as const,
     medium: '500' as const,
     semibold: '600' as const,
     bold: '700' as const,
+    extrabold: '800' as const,
   },
   
   // Line Heights

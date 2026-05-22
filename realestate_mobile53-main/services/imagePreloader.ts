@@ -66,14 +66,14 @@ class ImagePreloaderService {
     }
   }
 
-  getOptimizedImageProps(source: any) {
+  getOptimizedImageProps(source: any, cachePolicy: 'none' | 'disk' | 'memory' | 'memory-disk' = 'none') {
     return {
       source,
       contentFit: 'cover' as const,
       transition: 150, // Faster transition for better perceived performance
-      cachePolicy: 'memory-disk' as const,
+      cachePolicy: cachePolicy as any,
       priority: 'high' as const, // High priority loading
-      recyclingKey: `image_${Date.now()}`, // Help with memory management
+      recyclingKey: typeof source === 'string' ? source : `image_${Date.now()}`, // Use source as key if possible
     };
   }
 

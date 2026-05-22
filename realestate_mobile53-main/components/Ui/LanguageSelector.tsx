@@ -1,36 +1,36 @@
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   FlatList,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from '../../hooks/useTranslation';
+import { supportedLanguages, getCurrentLanguageInfo } from '../../services/i18n';
 import { Colors } from '../styles';
+import { BottomSheet } from './BottomSheet';
+import { BottomSheetModalMethods } from './BottomSheet';
 
 interface LanguageSelectorProps {
   style?: any;
 }
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => {
-  const { 
-    currentLanguageInfo, 
-    supportedLanguages, 
-    changeLanguage, 
-    t 
-  } = useLanguage();
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const { changeLanguage } = useLanguage();
+  const { t } = useTranslation();
+  const currentLanguageInfo = getCurrentLanguageInfo();
+  
+  const bottomSheetRef = useRef<BottomSheetModalMethods>(null);
 
   const handleLanguageSelect = async (languageCode: string) => {
-    const success = await changeLanguage(languageCode);
-    if (success) {
-      setShowLanguageModal(false);
-      // You might want to show a success message or restart the app
-      // For now, the context will handle the language change
+    try {
+      await changeLanguage(languageCode);
+      bottomSheetRef.current?.dismiss();
+    } catch (error) {
+      console.error('Error changing language:', error);
     }
   };
 
@@ -38,7 +38,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
     <>
       <TouchableOpacity
         style={[styles.container, style]}
-        onPress={() => setShowLanguageModal(true)}
+        onPress={() => bottomSheetRef.current?.present()}
         activeOpacity={0.7}
       >
         <View style={styles.content}>
@@ -57,50 +57,35 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({ style }) => 
         </View>
       </TouchableOpacity>
 
-      {/* Language Selection Modal */}
-      <Modal
-        visible={showLanguageModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowLanguageModal(false)}
+      <BottomSheet
+        ref={bottomSheetRef}
+        title={t('selectLanguage')}
+        snapPoints={['50%']}
       >
-        <BlurView intensity={50} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('selectLanguage')}</Text>
-              <TouchableOpacity
-                onPress={() => setShowLanguageModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#333333" />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={supportedLanguages}
-              keyExtractor={(item) => item.code}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.languageItem,
-                    currentLanguageInfo.code === item.code && styles.selectedLanguageItem,
-                  ]}
-                  onPress={() => handleLanguageSelect(item.code)}
-                >
-                  <View style={styles.languageItemContent}>
-                    <Text style={styles.languageName}>{item.name}</Text>
-                    <Text style={styles.languageNativeName}>{item.nativeName}</Text>
-                  </View>
-                  {currentLanguageInfo.code === item.code && (
-                    <Ionicons name="checkmark" size={20} color={Colors.primary} />
-                  )}
-                </TouchableOpacity>
+        <FlatList
+          data={supportedLanguages}
+          keyExtractor={(item) => item.code}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.languageItem,
+                currentLanguageInfo.code === item.code && styles.selectedLanguageItem,
+              ]}
+              onPress={() => handleLanguageSelect(item.code)}
+            >
+              <View style={styles.languageItemContent}>
+                <Text style={styles.languageName}>{item.name}</Text>
+                <Text style={styles.languageNativeName}>{item.nativeName}</Text>
+              </View>
+              {currentLanguageInfo.code === item.code && (
+                <Ionicons name="checkmark" size={20} color={Colors.primary} />
               )}
-            />
-          </View>
-        </BlurView>
-      </Modal>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.listContent}
+        />
+      </BottomSheet>
     </>
   );
 };
@@ -136,34 +121,6 @@ const styles = StyleSheet.create({
   chevron: {
     marginLeft: 4,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '60%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-  },
-  closeButton: {
-    padding: 5,
-  },
   languageItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -188,5 +145,8 @@ const styles = StyleSheet.create({
   languageNativeName: {
     fontSize: 14,
     color: '#8A8A8A',
+  },
+  listContent: {
+    paddingBottom: 20,
   },
 });

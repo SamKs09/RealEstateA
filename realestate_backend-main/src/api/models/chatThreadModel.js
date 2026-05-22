@@ -25,7 +25,7 @@ const chatThreadSchema = new Schema(
         },
         role: {
           type: String,
-          enum: ["user", "support", "admin", "system"],
+          enum: ["user", "owner", "support", "admin", "system"],
           default: "user",
         },
         joinedAt: {
@@ -97,6 +97,13 @@ const chatThreadSchema = new Schema(
       userAgent: String,
       ipAddress: String,
       device: String,
+      listingId: {
+        type: Schema.Types.ObjectId,
+      },
+      listingType: {
+        type: String,
+        enum: ["property", "vehicle"],
+      },
     },
 
     // Timestamps

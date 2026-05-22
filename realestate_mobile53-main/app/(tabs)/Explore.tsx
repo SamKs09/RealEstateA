@@ -1,34 +1,115 @@
-import React, { useMemo, useCallback, useEffect, useState } from "react";
+import React, {
+  useMemo,
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   FlatList,
   Image,
   RefreshControl,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  BottomSheet,
+  BottomSheetModalMethods,
+} from "../../components/Ui/BottomSheet";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   SearchBar,
   FilterChip,
+  FilterPanel,
   PropertyCard,
   ScreenWrapper,
 } from "../../components/Ui";
+import { FilterState } from "../../components/Ui/FilterPanel";
 import { LoadingOverlay } from "../../components/Ui/LoadingOverlay";
-import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { useInterest } from "../../contexts/InterestContext";
 import { useAppInitialization } from "../../hooks/useAppInitialization";
 import { SCREEN_IMAGES } from "../../services/imagePreloader";
 import { searchProperties, Property } from "../../services/propertyService";
+import { getFullImageUrl } from "../../services/api";
+import * as vehicleService from "../../services/vehicleService";
+
+type ExploreCardItem = {
+  id: string;
+  image: any;
+  price: string;
+  address: string;
+  area: string;
+  bedrooms: number;
+  bathrooms: number;
+  distance: string;
+  title?: string;
+  isPromoted?: boolean;
+  promotionExpiry?: string;
+  views?: number;
+};
+
+type PromoStoryItem = {
+  id: string;
+  listingId: string;
+  title: string;
+  subtitle: string;
+  image: any;
+  isCar: boolean;
+};
+
+async function loadNotificationService() {
+  const module = await import("../../services/notificationService");
+  return module.notificationService;
+}
+
+// Maps English governorate names (as stored in the backend) to locale keys
+const GOVERNORATE_KEY_MAP: Record<string, string> = {
+  tunis: "tunis",
+  ariana: "ariana",
+  "ben arous": "ben_arous",
+  manouba: "manouba",
+  nabeul: "nabeul",
+  zaghouan: "zaghouan",
+  bizerte: "bizerte",
+  béja: "beja",
+  beja: "beja",
+  jendouba: "jendouba",
+  kef: "kef",
+  siliana: "siliana",
+  kairouan: "kairouan",
+  kasserine: "kasserine",
+  "sidi bouzid": "sidi_bouzid",
+  sousse: "sousse",
+  monastir: "monastir",
+  mahdia: "mahdia",
+  sfax: "sfax",
+  gafsa: "gafsa",
+  tozeur: "tozeur",
+  kebili: "kebili",
+  gabès: "gabes",
+  gabes: "gabes",
+  medenine: "medenine",
+  tataouine: "tataouine",
+};
 
 export default function ExploreScreen() {
-  const { t } = useLanguage();
-  const { userInterest, refreshPreferences } = useInterest();
+  const { t } = useTranslation();
+  const { activeView, setActiveView, refreshPreferences } = useInterest();
+
+  const translateCity = useCallback(
+    (city: string): string => {
+      if (!city) return city;
+      const govKey = GOVERNORATE_KEY_MAP[city.toLowerCase()];
+      return govKey ? t(`governorates.${govKey}`) : city;
+    },
+    [t],
+  );
   const { isImagesPreloaded } = useAppInitialization();
   const router = useRouter();
 
@@ -39,93 +120,340 @@ export default function ExploreScreen() {
 
   const propertyFilters = useMemo(
     () => [
+      t("explore.all"),
       t("explore.house"),
       t("explore.apartment"),
-      t("explore.hotel"),
       t("explore.villa"),
+      t("explore.hotel"),
+      t("explore.land"),
+      t("explore.commercial"),
+      t("explore.office"),
     ],
-    [t]
+    [t],
   );
 
-  const carFilters = useMemo(() => ["Sedan", "SUV", "Truck", "Sports Car"], []);
+  const carFilters = useMemo(
+    () => [
+      t("explore.all"),
+      t("addCar.car"),
+      t("addCar.motorcycle"),
+      t("addCar.truck"),
+      t("addCar.van"),
+      t("addCar.bus"),
+    ],
+    [t],
+  );
 
-  const filters = userInterest === "cars" ? carFilters : propertyFilters;
+  const filters = activeView === "cars" ? carFilters : propertyFilters;
 
   const [activeFilter, setActiveFilter] = React.useState(() =>
-    userInterest === "cars" ? "Sedan" : t("explore.house")
+    t("explore.all"),
   );
   const [selectedLocation, setSelectedLocation] = React.useState(() =>
-    t("governorates.sousse")
+    t("governorates.sousse"),
   );
+
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>({
+    listingType: [],
+    transmission: [],
+    fuelType: [],
+    propertyType: [],
+    location: [],
+    minPrice: 0,
+    maxPrice: 500000,
+  });
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      activeFilters.listingType.length > 0 ||
+      activeFilters.transmission.length > 0 ||
+      activeFilters.fuelType.length > 0 ||
+      activeFilters.propertyType.length > 0 ||
+      activeFilters.location.length > 0 ||
+      activeFilters.minPrice > 0 ||
+      activeFilters.maxPrice < 500000
+    );
+  }, [activeFilters]);
 
   // Refresh preferences when screen gains focus (important after login)
   useEffect(() => {
     console.log("📍 Explore screen mounted - refreshing preferences");
     refreshPreferences();
-    if (userInterest !== "cars") {
+    // fetchData is handled by the activeFilter effect
+  }, [refreshPreferences]);
+
+  // Handle active filter changes
+  useEffect(() => {
+    console.log(`🔍 Filter changed: ${activeFilter} (View: ${activeView})`);
+    if (activeView === "cars") {
+      fetchVehicles();
+    } else {
       fetchProperties();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshPreferences, userInterest]);
+  }, [activeFilter, activeView, activeFilters, selectedLocation]);
 
   // Fetch properties from backend
-  const fetchProperties = async () => {
-    if (userInterest === "cars") {
-      // Don't fetch properties for cars
-      return;
-    }
-
+  const fetchProperties = useCallback(async () => {
     setIsLoadingProperties(true);
     try {
-      console.log("  Fetching properties from backend...");
+      // Use propertyType filter if available, otherwise use activeFilter
+      const selectedType =
+        activeFilters.propertyType.length > 0
+          ? activeFilters.propertyType[0]
+          : (() => {
+              // If "All" is selected, don't filter by type
+              if (activeFilter === t("explore.all")) {
+                return undefined;
+              }
+              const typeMap: Record<string, string> = {
+                [t("explore.house")]: "house",
+                [t("explore.apartment")]: "apartment",
+                [t("explore.villa")]: "villa",
+                [t("explore.hotel")]: "hotel",
+                [t("explore.land")]: "land",
+                [t("explore.commercial")]: "commercial",
+                [t("explore.office")]: "office",
+              };
+              return typeMap[activeFilter];
+            })();
+
+      // Handle location filter logic
+      let searchLocation: string | undefined;
+      if (activeFilters.location.includes("city")) {
+        // If "City" is selected, use the selected city from dropdown
+        searchLocation = selectedLocation;
+      } else {
+        // By default, don't filter by location to show all properties
+        searchLocation = undefined;
+      }
+
+      console.log(
+        `Fetching properties with type: ${selectedType || "all"}, location: ${searchLocation || "all cities"}...`,
+      );
+
       const response = await searchProperties({
-        status: "active", // Backend uses "active" not "available"
+        status: "active",
+        type: selectedType,
+        listingType:
+          activeFilters.listingType.length > 0
+            ? activeFilters.listingType.join(",")
+            : undefined,
+        minPrice: activeFilters.minPrice,
+        maxPrice: activeFilters.maxPrice,
+        city: searchLocation || undefined,
         limit: 20,
       });
 
-      // Backend returns { properties, pagination }
-      const properties = response.properties || [];
-      console.log(`✅ Fetched ${properties.length} properties`);
+      const properties = (response.properties || []).sort((left, right) => {
+        const leftPromoted = left.isPromoted ? 1 : 0;
+        const rightPromoted = right.isPromoted ? 1 : 0;
 
-      // Log properties to check for undefined IDs
-      properties.forEach((prop: any, index: number) => {
-        if (!prop._id && !prop.id) {
-          console.warn(`⚠️ Property at index ${index} has no ID:`, prop);
+        if (rightPromoted !== leftPromoted) {
+          return rightPromoted - leftPromoted;
         }
-      });
 
+        return (
+          new Date(right.promotionExpiry || right.createdAt || 0).getTime() -
+          new Date(left.promotionExpiry || left.createdAt || 0).getTime()
+        );
+      });
       setBackendProperties(properties);
     } catch (error) {
       console.error("❌ Error fetching properties:", error);
     } finally {
       setIsLoadingProperties(false);
     }
-  };
+  }, [activeFilter, activeFilters, selectedLocation, t]);
+
+  // State for backend vehicles
+  const [backendVehicles, setBackendVehicles] = useState<any[]>([]);
+
+  // Fetch vehicles from backend
+  const fetchVehicles = useCallback(async () => {
+    setIsLoadingProperties(true); // Reusing loading state for simplicity
+    try {
+      const typeMap: Record<string, string> = {
+        [t("addCar.car")]: "car",
+        [t("addCar.motorcycle")]: "motorcycle",
+        [t("addCar.truck")]: "truck",
+        [t("addCar.van")]: "van",
+        [t("addCar.bus")]: "bus",
+      };
+
+      // List of car brands for filtering
+      const carBrands = ["BMW", "Audi", "Mercedes", "Ford", "Honda"];
+
+      let selectedType: string | undefined;
+      let selectedMake: string | undefined;
+
+      // If "All" is selected, don't filter by type or make
+      if (activeFilter === t("explore.all")) {
+        selectedType = undefined;
+        selectedMake = undefined;
+      } else if (carBrands.includes(activeFilter)) {
+        // Filter by vehicle brand/make
+        selectedType = undefined;
+        selectedMake = activeFilter;
+      } else {
+        // Filter by vehicle type
+        selectedType = typeMap[activeFilter];
+        selectedMake = undefined;
+      }
+
+      // Handle location filter for vehicles
+      let searchLocation: string | undefined;
+      if (activeFilters.location.includes("city")) {
+        // Only filter by location if user explicitly selected city filter
+        searchLocation = selectedLocation;
+      } else {
+        // By default, don't filter by location to show all vehicles
+        searchLocation = undefined;
+      }
+
+      console.log(
+        `🚗 Fetching vehicles with type: ${selectedType || "all"}, make: ${selectedMake || "all"}, location: ${searchLocation || "all"}...`,
+      );
+      const response = await vehicleService.searchVehicles({
+        status: "active",
+        type: selectedType,
+        make: selectedMake,
+        listingType:
+          activeFilters.listingType.length > 0
+            ? activeFilters.listingType.join(",")
+            : undefined,
+        transmission:
+          activeFilters.transmission.length > 0
+            ? activeFilters.transmission.join(",")
+            : undefined,
+        fuelType:
+          activeFilters.fuelType.length > 0
+            ? activeFilters.fuelType.join(",")
+            : undefined,
+        minPrice: activeFilters.minPrice,
+        maxPrice: activeFilters.maxPrice,
+        location: searchLocation,
+        limit: 20,
+      });
+
+      const vehicles = [...(response.data || [])].sort(
+        (left: any, right: any) => {
+          const leftPromoted = left.isPromoted ? 1 : 0;
+          const rightPromoted = right.isPromoted ? 1 : 0;
+
+          if (rightPromoted !== leftPromoted) {
+            return rightPromoted - leftPromoted;
+          }
+
+          return (
+            new Date(right.promotionExpiry || right.createdAt || 0).getTime() -
+            new Date(left.promotionExpiry || left.createdAt || 0).getTime()
+          );
+        },
+      );
+
+      console.log(`✅ Fetched ${vehicles.length} vehicles`);
+      console.log("📦 Vehicle data:", JSON.stringify(vehicles, null, 2));
+      setBackendVehicles(vehicles);
+    } catch (error) {
+      console.error("❌ Error fetching vehicles:", error);
+      setBackendVehicles([]);
+    } finally {
+      setIsLoadingProperties(false);
+    }
+  }, [activeFilter, activeFilters, selectedLocation, t]);
 
   // Handle pull to refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchProperties();
-    setRefreshing(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userInterest]);
-
-  // Refresh preferences when screen gains focus (important after login)
-  useEffect(() => {
-    console.log("📍 Explore screen mounted - refreshing preferences");
-    refreshPreferences();
-  }, [refreshPreferences]);
-
-  // Update active filter when user interest changes
-  useEffect(() => {
-    console.log(`🎯 User interest changed to: ${userInterest}`);
-    if (userInterest === "cars") {
-      setActiveFilter("Sedan");
+    if (activeView === "cars") {
+      await fetchVehicles();
     } else {
-      setActiveFilter(t("explore.house"));
+      await fetchProperties();
     }
-  }, [userInterest, t]);
-  const [showLocationModal, setShowLocationModal] = React.useState(false);
+    setRefreshing(false);
+  }, [activeView, fetchVehicles, fetchProperties]);
+
+  // Refetch data when screen comes into focus (e.g., after adding a new item)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log("🔄 Explore screen focused, refetching data...");
+      if (activeView === "cars") {
+        fetchVehicles();
+      } else {
+        fetchProperties();
+      }
+    }, [activeView, fetchVehicles, fetchProperties]),
+  );
+
+  // Update active filter when active view changes
+  useEffect(() => {
+    console.log(`🎯 Active view changed to: ${activeView}`);
+    setActiveFilter(t("explore.all")); // Default to All when switching views
+  }, [activeView, t]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  // Fetch unread count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const notificationService = await loadNotificationService();
+      const count = await notificationService.getUnreadCount();
+      setUnreadNotifications(count);
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  }, []);
+
+  // Load notification preferences
+  const loadNotificationPreferences = useCallback(async () => {
+    try {
+      const notificationService = await loadNotificationService();
+      await notificationService.getPreferences();
+    } catch (error) {
+      console.error("Error loading notification preferences:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    let notificationService: Awaited<
+      ReturnType<typeof loadNotificationService>
+    > | null = null;
+    let isActive = true;
+    const handleNewNotif = () => fetchUnreadCount();
+    const handleAllRead = () => setUnreadNotifications(0);
+    const handleCleared = () => setUnreadNotifications(0);
+    const handleRead = () => fetchUnreadCount();
+
+    fetchUnreadCount();
+    loadNotificationPreferences();
+
+    loadNotificationService()
+      .then((service) => {
+        if (!isActive) {
+          return;
+        }
+
+        notificationService = service;
+        notificationService.on("notification:received", handleNewNotif);
+        notificationService.on("notification:all-read", handleAllRead);
+        notificationService.on("notification:cleared", handleCleared);
+        notificationService.on("notification:read", handleRead);
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+      if (notificationService) {
+        notificationService.off("notification:received", handleNewNotif);
+        notificationService.off("notification:all-read", handleAllRead);
+        notificationService.off("notification:cleared", handleCleared);
+        notificationService.off("notification:read", handleRead);
+      }
+    };
+  }, [fetchUnreadCount, loadNotificationPreferences]);
+
+  const locationBottomSheetRef = useRef<BottomSheetModalMethods>(null);
 
   // All 24 Tunisian Governorates (translated)
   const tunisianStates = useMemo(
@@ -155,72 +483,59 @@ export default function ExploreScreen() {
       t("governorates.medenine"),
       t("governorates.tataouine"),
     ],
-    [t]
-  );
-
-  const carProperties = useMemo(
-    () => [
-      {
-        id: "mock-car-1",
-        image: require("../../assets/images/Cars/Bmx6.webp"),
-        price: "341 km",
-        address: "BMW i5",
-        area: "Aheckhamel",
-        bedrooms: 450, // Power in kW
-        bathrooms: 280, // Max speed in km/h
-        distance: "341 km",
-      },
-      {
-        id: "mock-car-2",
-        image: require("../../assets/images/Cars/Mercedes-Benz.jpg"),
-        price: "432 km",
-        address: "Audi A6",
-        area: "Aheckhamel",
-        bedrooms: 380, // Power in kW
-        bathrooms: 250, // Max speed in km/h
-        distance: "432 km",
-      },
-    ],
-    []
-  );
-
-  const houseProperties = useMemo(
-    () => [
-      {
-        id: "mock-house-1",
-        image: require("../../assets/images/ScreensImages/House1.jpg"),
-        price: "Rp. 2.500.000.000",
-        address: "Jl. Sultan Iskandar Muda",
-        area: "Jakarta Selatan",
-        bedrooms: 6,
-        bathrooms: 4,
-        distance: "1.8 km",
-      },
-      {
-        id: "mock-house-2",
-        image: require("../../assets/images/ScreensImages/House2.jpg"),
-        price: "Rp. 2.300.000.000",
-        address: "Jl. Cipete Raya",
-        area: "Jakarta Selatan",
-        bedrooms: 5,
-        bathrooms: 3,
-        distance: "2.5 km",
-      },
-    ],
-    []
+    [t],
   );
 
   // Combine backend properties with mock data
-  const properties = useMemo(() => {
-    if (userInterest === "cars") {
-      return carProperties;
+  const properties = useMemo<ExploreCardItem[]>(() => {
+    console.log(
+      `🔄 Computing properties - activeView: ${activeView}, backendVehicles: ${backendVehicles.length}, backendProperties: ${backendProperties.length}`,
+    );
+
+    if (activeView === "cars") {
+      // ONLY show vehicles - no properties
+      const backendVehiclesFormatted = backendVehicles.map((vehicle: any) => {
+        const images = vehicle.media?.images || [];
+        const firstImage = images[0];
+        const price =
+          vehicle.pricing?.rentPrice || vehicle.pricing?.salePrice || 0;
+        const rentPeriod = vehicle.pricing?.rentPeriod || "";
+
+        console.log(`🚗 Formatting vehicle: ${vehicle.title}`, {
+          id: vehicle._id || vehicle.id,
+          make: vehicle.vehicleDetails?.make,
+          model: vehicle.vehicleDetails?.model,
+          firstImage,
+        });
+
+        return {
+          id: `backend-car-${vehicle._id || vehicle.id}`,
+          image: firstImage
+            ? { uri: firstImage }
+            : require("../../assets/images/Cars/Bmx6.webp"),
+          price: `${price} DT${rentPeriod ? "/" + rentPeriod : ""}`,
+          address: vehicle.title,
+          area: `${vehicle.vehicleDetails?.make} ${vehicle.vehicleDetails?.model}`,
+          bedrooms: vehicle.vehicleDetails?.year || 0,
+          bathrooms: vehicle.vehicleDetails?.mileage || 0,
+          distance: translateCity(vehicle.location?.city || "") || "Tunisia",
+          title: vehicle.title,
+          isPromoted: Boolean(vehicle.isPromoted),
+          promotionExpiry: vehicle.promotionExpiry,
+        };
+      });
+
+      console.log(
+        `✅ Returning ${backendVehiclesFormatted.length} vehicles (NO mock data)`,
+      );
+      // Return ONLY backend vehicles, no mock cars
+      return backendVehiclesFormatted;
     }
 
-    // Convert backend properties to match the display format
+    // ONLY show properties - no vehicles
     const backendPropertiesFormatted = backendProperties
-      .filter((prop: any) => prop && (prop._id || prop.id)) // Filter out properties without valid IDs
+      .filter((prop: any) => prop && (prop._id || prop.id))
       .map((prop: any, index: number) => {
-        // Extract values from nested structure
         const propertyId = prop._id || prop.id;
         const bedrooms = prop.propertyDetails?.bedrooms || 0;
         const bathrooms = prop.propertyDetails?.bathrooms || 0;
@@ -236,95 +551,129 @@ export default function ExploreScreen() {
             : require("../../assets/images/ScreensImages/House1.jpg"),
           price: `${price} DT/${rentPeriod}`,
           address: prop.location?.address || prop.title,
-          area: prop.location?.city || prop.location?.state || "",
+          area: translateCity(
+            prop.location?.city || prop.location?.state || "",
+          ),
           bedrooms: bedrooms,
           bathrooms: bathrooms,
-          distance: "Near you",
+          distance: t("explore.nearFromYou"),
+          title: prop.title,
+          isPromoted: Boolean(prop.isPromoted),
+          promotionExpiry: prop.promotionExpiry,
+          views: (prop as any).views || 0,
         };
       });
 
-    // Show backend properties first, then mock data
-    return [...backendPropertiesFormatted, ...houseProperties];
-  }, [userInterest, backendProperties, carProperties, houseProperties]);
+    // Return ONLY backend properties, no mock houses
+    return backendPropertiesFormatted;
+  }, [activeView, backendProperties, backendVehicles, t, translateCity]);
 
-  const bestCars = useMemo(
-    () => [
-      {
-        id: "best-car-1",
-        image: require("../../assets/images/Cars/Bmx6.webp"),
-        title: "BMW i6",
-        price: "300DT",
-        address: "1KW away!",
-        area: "300,000 Km",
-        bedrooms: 450, // Power in kW
-        bathrooms: 280, // Max speed in km/h
-      },
-      {
-        id: "best-car-2",
-        image: require("../../assets/images/Cars/Mercedes-Benz.jpg"),
-        title: "Mercedes-Benz S-Class",
-        price: "450DT",
-        address: "2KW away!",
-        area: "250,000 Km",
-        bedrooms: 380, // Power in kW
-        bathrooms: 250, // Max speed in km/h
-      },
-    ],
-    []
+  const promotedProperties = useMemo(
+    () => properties.filter((property) => property.isPromoted),
+    [properties],
   );
 
-  const bestHouses = useMemo(
-    () => [
-      {
-        id: "best-house-1",
-        image: SCREEN_IMAGES.house1,
-        title: "Orchad House",
-        price: `2.500DT ${t("property.perMonth")}`,
-        address: "Jl. Sultan Iskandar Muda",
-        area: "Jakarta Selatan",
-        bedrooms: 6,
-        bathrooms: 4,
-      },
-      {
-        id: "best-house-2",
-        image: SCREEN_IMAGES.house2,
-        title: "The Hollies House",
-        price: `2.300DT ${t("property.perMonth")}`,
-        address: "Jl. Cipete Raya",
-        area: "Jakarta Selatan",
-        bedrooms: 5,
-        bathrooms: 3,
-      },
-    ],
-    [t]
-  );
+  const swipeProperties = useMemo(() => {
+    const base =
+      promotedProperties.length > 0 ? promotedProperties : properties;
+    return [...base]
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 10);
+  }, [promotedProperties, properties]);
 
-  const bestProperties = userInterest === "cars" ? bestCars : bestHouses;
+  const bestProperties = useMemo(() => {
+    const organicProperties = properties.filter(
+      (property) => !property.isPromoted,
+    );
+    return (
+      organicProperties.length > 0 ? organicProperties : properties
+    ).slice(0, 6);
+  }, [properties]);
+
+  const promoStories = useMemo<PromoStoryItem[]>(() => {
+    if (activeView === "cars") {
+      return backendVehicles
+        .filter((vehicle: any) => vehicle.isPromoted)
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.promotionExpiry || 0).getTime() -
+            new Date(a.promotionExpiry || 0).getTime(),
+        )
+        .slice(0, 10)
+        .map((vehicle: any) => ({
+          id: `story-car-${vehicle._id || vehicle.id}`,
+          listingId: vehicle._id || vehicle.id,
+          title: vehicle.title || "Vehicle",
+          subtitle:
+            translateCity(vehicle.location?.city || "") ||
+            `${vehicle.vehicleDetails?.make || ""} ${vehicle.vehicleDetails?.model || ""}`.trim(),
+          image: vehicle.media?.images?.[0]
+            ? { uri: vehicle.media.images[0] }
+            : require("../../assets/images/Cars/Bmx6.webp"),
+          isCar: true,
+        }));
+    }
+
+    return backendProperties
+      .filter((property) => property.isPromoted)
+      .sort(
+        (a, b) =>
+          new Date(b.promotionExpiry || 0).getTime() -
+          new Date(a.promotionExpiry || 0).getTime(),
+      )
+      .slice(0, 10)
+      .map((property) => ({
+        id: `story-property-${property._id || property.id}`,
+        listingId: property._id || property.id || "",
+        title: property.title || "Property",
+        subtitle: translateCity(
+          property.location?.city || property.location?.state || "",
+        ),
+        image: getFullImageUrl(property.media?.images?.[0])
+          ? { uri: getFullImageUrl(property.media?.images?.[0]) }
+          : SCREEN_IMAGES.house1,
+        isCar: false,
+      }));
+  }, [activeView, backendProperties, backendVehicles, translateCity]);
 
   const handleLocationSelect = useCallback((location: string) => {
     setSelectedLocation(location);
-    setShowLocationModal(false);
+    locationBottomSheetRef.current?.dismiss();
   }, []);
 
   const handlePropertyPress = useCallback(
     (property: any) => {
-      console.log(
-        "  Navigating to booking details for property:",
-        property.title
-      );
-      // Navigate to booking details with property information
+      // Go to property info page with property id (strip backend- prefix if present)
+      let id = property.id;
+      const isCar = typeof id === "string" && id.includes("-car-");
+
+      if (typeof id === "string") {
+        id = id.replace("backend-car-", "").replace("backend-", "");
+      }
+
+      if (isCar) {
+        // We might need a car_info screen, but for now properties use property_info
+        router.push({
+          pathname: "/property_info",
+          params: { id, type: "vehicle" },
+        });
+      } else {
+        router.push({ pathname: "/property_info", params: { id } });
+      }
+    },
+    [router],
+  );
+
+  const handleStoryPress = useCallback(
+    (story: PromoStoryItem) => {
       router.push({
-        pathname: "/booking/booking-details",
-        params: {
-          propertyId: property.id,
-          propertyTitle: property.title,
-          propertyPrice: property.price,
-          propertyAddress: property.address,
-          propertyImage: JSON.stringify(property.image), // Serialize image data
-        },
+        pathname: "/property_info",
+        params: story.isCar
+          ? { id: story.listingId, type: "vehicle" }
+          : { id: story.listingId },
       });
     },
-    [router]
+    [router],
   );
 
   return (
@@ -332,69 +681,132 @@ export default function ExploreScreen() {
       <LoadingOverlay
         visible={!isImagesPreloaded || isLoadingProperties}
         message={
-          isLoadingProperties
-            ? "Loading properties..."
-            : "Optimizing images for better performance..."
+          isLoadingProperties ? t("explore.loadingProperties") : t("loading")
         }
       />
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.locationLabel}>{t("explore.location")}</Text>
+
+      {/* FIXED HEADER - now outside ScrollView */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.locationLabel}>{t("explore.location")}</Text>
+          <TouchableOpacity
+            style={styles.locationSelector}
+            onPress={() => locationBottomSheetRef.current?.present()}
+          >
+            <Ionicons name="location" size={18} color="#FF8C42" />
+            <Text style={styles.locationText}>{selectedLocation}</Text>
+            <Ionicons name="chevron-down" size={16} color="#8A8A8A" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.headerIcons}>
+          {/* Compact view switch — visible for all users */}
+          <View style={styles.viewSwitch}>
             <TouchableOpacity
-              style={styles.locationDropdown}
-              onPress={() => setShowLocationModal(true)}
+              style={[
+                styles.switchTab,
+                activeView === "property" && styles.switchTabActive,
+              ]}
+              onPress={() => setActiveView("property")}
+              accessibilityRole="button"
+              accessibilityLabel={t("explore.switchProperties")}
             >
-              <Text style={styles.locationText}>{selectedLocation}</Text>
               <Ionicons
-                name="chevron-down"
+                name="home-outline"
                 size={16}
-                color="#8A8A8A"
-                style={{ marginLeft: 8 }}
+                color={activeView === "property" ? "#fff" : "#8A8A8A"}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.switchTab,
+                activeView === "cars" && styles.switchTabActive,
+              ]}
+              onPress={() => setActiveView("cars")}
+              accessibilityRole="button"
+              accessibilityLabel={t("explore.switchCars")}
+            >
+              <Ionicons
+                name="car-outline"
+                size={16}
+                color={activeView === "cars" ? "#fff" : "#8A8A8A"}
               />
             </TouchableOpacity>
           </View>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconButton}>
+
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.push("/notifications")}
+          >
+            <View>
               <Ionicons
                 name="notifications-outline"
                 size={24}
                 color="#333333"
               />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <View style={styles.toggleContainer}>
-                <View style={styles.toggleSwitch}>
-                  <View style={styles.toggleThumb} />
+              {unreadNotifications > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  </Text>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </View>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
+      </View>
 
+      {/* ScrollView - no header inside anymore */}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Search */}
         <View style={styles.searchSection}>
           <SearchBar
             placeholder={
-              userInterest === "cars"
-                ? "Search address, or near you"
+              activeView === "cars"
+                ? t("explore.searchNearYou")
                 : t("explore.searchPlaceholder")
             }
+            onFilterPress={() => setIsFilterVisible(true)}
+            showActiveIndicator={hasActiveFilters}
           />
         </View>
 
         {/* Filters */}
         <View style={styles.filtersSection}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {userInterest === "cars" ? (
+            {activeView === "cars" ? (
               <View style={styles.carBrandsContainer}>
+                {/* All button */}
+                <TouchableOpacity
+                  key="all"
+                  style={[
+                    styles.carBrandItem,
+                    styles.allBrandItem,
+                    activeFilter === t("explore.all") &&
+                      styles.carBrandItemActive,
+                  ]}
+                  onPress={() => setActiveFilter(t("explore.all"))}
+                >
+                  <Text
+                    style={[
+                      styles.allBrandText,
+                      activeFilter === t("explore.all") &&
+                        styles.allBrandTextActive,
+                    ]}
+                  >
+                    {t("explore.all")}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Brand logos */}
                 {[
                   {
                     name: "BMW",
@@ -444,119 +856,233 @@ export default function ExploreScreen() {
           </ScrollView>
         </View>
 
-        {/* Near from you section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {userInterest === "cars"
-                ? t("explore.nearFromYouCars")
-                : t("explore.nearFromYou")}
+        {promoStories.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {t("explore.boostedStories")}
+              </Text>
+              <Text style={styles.sectionCaption}>
+                {t("explore.promotedBySellers")}
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.storiesContainer}
+            >
+              {promoStories.map((story) => (
+                <TouchableOpacity
+                  key={story.id}
+                  style={styles.storyCard}
+                  onPress={() => handleStoryPress(story)}
+                  activeOpacity={0.85}
+                >
+                  <Image source={story.image} style={styles.storyCardImage} />
+                  <View style={styles.storyCardOverlay} />
+
+                  <View style={styles.storyContent}>
+                    <Text style={styles.storyTitle} numberOfLines={2}>
+                      {story.title}
+                    </Text>
+                    <Text style={styles.storySubtitle} numberOfLines={1}>
+                      {story.subtitle || t("explore.promotedFallback")}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Near from you section OR Empty State */}
+        {properties.length === 0 && !isLoadingProperties ? (
+          // Empty State
+          <View style={styles.emptyStateContainer}>
+            <Text style={styles.emptyStateTitle}>
+              {t("explore.noResultsFound")}
             </Text>
-            <TouchableOpacity>
-              <Text style={styles.seeMore}>{t("explore.seeMore")}</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              {t("explore.tryAdjustingFilters")}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.clearFiltersButton}
+              onPress={() => {
+                // Clear all filters
+                setActiveFilters({
+                  listingType: [],
+                  transmission: [],
+                  fuelType: [],
+                  propertyType: [],
+                  location: [],
+                  minPrice: 0,
+                  maxPrice: 500000,
+                });
+                setActiveFilter(t("explore.all"));
+              }}
+            >
+              <Text style={styles.clearFiltersButtonText}>
+                {t("explore.clearFilters")}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.browseAllButton}
+              onPress={() => {
+                // Clear filters and show all
+                setActiveFilters({
+                  listingType: [],
+                  transmission: [],
+                  fuelType: [],
+                  propertyType: [],
+                  location: [],
+                  minPrice: 0,
+                  maxPrice: 500000,
+                });
+                if (activeView === "cars") {
+                  fetchVehicles();
+                } else {
+                  fetchProperties();
+                }
+              }}
+            >
+              <Text style={styles.browseAllButtonText}>
+                {t("explore.browseAll")}
+              </Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.propertyList}>
-              {properties.map((property) => (
+        ) : (
+          <>
+            {/* Boosted swipe section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {promotedProperties.length > 0
+                    ? activeView === "cars"
+                      ? t("explore.boostedVehicles")
+                      : t("explore.boostedListings")
+                    : activeView === "cars"
+                      ? t("explore.nearFromYouCars")
+                      : t("explore.nearFromYou")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: "/all-properties",
+                      params: { mode: activeView },
+                    })
+                  }
+                >
+                  <Text style={styles.seeMore}>{t("explore.seeMore")}</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.propertyList}>
+                  {swipeProperties.map((property) => (
+                    <PropertyCard
+                      key={property.id}
+                      image={property.image}
+                      price={property.price}
+                      address={property.address}
+                      area={property.area}
+                      bedrooms={property.bedrooms}
+                      bathrooms={property.bathrooms}
+                      distance={property.distance}
+                      mode={activeView}
+                      onPress={() => handlePropertyPress(property)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            {/* Best for you section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {activeView === "cars"
+                    ? t("explore.bestForYouCars")
+                    : t("explore.bestForYou")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: "/all-properties",
+                      params: { mode: activeView },
+                    })
+                  }
+                >
+                  <Text style={styles.seeMore}>{t("explore.seeMore")}</Text>
+                </TouchableOpacity>
+              </View>
+              {bestProperties.map((property) => (
                 <PropertyCard
                   key={property.id}
                   image={property.image}
+                  title={property.title}
                   price={property.price}
                   address={property.address}
                   area={property.area}
                   bedrooms={property.bedrooms}
                   bathrooms={property.bathrooms}
-                  distance={property.distance}
-                  mode={userInterest}
+                  variant="best"
+                  mode={activeView}
+                  style={styles.bestPropertyCardMargin}
                   onPress={() => handlePropertyPress(property)}
                 />
               ))}
             </View>
-          </ScrollView>
-        </View>
-
-        {/* Best for you section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {userInterest === "cars"
-                ? t("explore.bestForYouCars")
-                : t("explore.bestForYou")}
-            </Text>
-            <TouchableOpacity>
-              <Text style={styles.seeMore}>{t("explore.seeMore")}</Text>
-            </TouchableOpacity>
-          </View>
-          {bestProperties.map((property) => (
-            <PropertyCard
-              key={property.id}
-              image={property.image}
-              title={property.title}
-              price={property.price}
-              address={property.address}
-              area={property.area}
-              bedrooms={property.bedrooms}
-              bathrooms={property.bathrooms}
-              variant="best"
-              mode={userInterest}
-              style={styles.bestPropertyCardMargin}
-              onPress={() => handlePropertyPress(property)}
-            />
-          ))}
-        </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* Location Selection Modal */}
-      <Modal
-        visible={showLocationModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowLocationModal(false)}
+      {/* Location Selection Bottom Sheet */}
+      <BottomSheet
+        ref={locationBottomSheetRef}
+        title={t("explore.selectLocation")}
+        snapPoints={["60%"]}
       >
-        <BlurView intensity={50} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {t("explore.selectLocation")}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowLocationModal(false)}
-                style={styles.closeButton}
+        <FlatList
+          data={tunisianStates}
+          keyExtractor={(item) => item}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.locationItem,
+                selectedLocation === item && styles.selectedLocationItem,
+              ]}
+              onPress={() => handleLocationSelect(item)}
+            >
+              <Text
+                style={[
+                  styles.locationItemText,
+                  selectedLocation === item && styles.selectedLocationText,
+                ]}
               >
-                <Ionicons name="close" size={24} color="#333333" />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={tunisianStates}
-              keyExtractor={(item) => item}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.locationItem,
-                    selectedLocation === item && styles.selectedLocationItem,
-                  ]}
-                  onPress={() => handleLocationSelect(item)}
-                >
-                  <Text
-                    style={[
-                      styles.locationItemText,
-                      selectedLocation === item && styles.selectedLocationText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                  {selectedLocation === item && (
-                    <Ionicons name="checkmark" size={20} color="#FF8C42" />
-                  )}
-                </TouchableOpacity>
+                {item}
+              </Text>
+              {selectedLocation === item && (
+                <Ionicons name="checkmark" size={20} color="#FF8C42" />
               )}
-            />
-          </View>
-        </BlurView>
-      </Modal>
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.listContent}
+        />
+      </BottomSheet>
+
+      {/* Advanced Filter Panel */}
+      <FilterPanel
+        isVisible={isFilterVisible}
+        onClose={() => setIsFilterVisible(false)}
+        onApply={(newFilters) => {
+          setActiveFilters(newFilters);
+          // fetch is triggered by useEffect on activeFilters
+        }}
+        initialFilters={activeFilters}
+        interest={activeView === "cars" ? "cars" : "property"}
+      />
     </ScreenWrapper>
   );
 }
@@ -568,10 +1094,15 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
+    backgroundColor: "#fff",
+    // borderBottomWidth: 1,
+    // borderBottomColor: "#eee",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 25,
+    paddingTop: 16,
+    paddingBottom: 8,
+    // ← REMOVED: position, top, left, right, zIndex
   },
   locationLabel: {
     fontSize: 12,
@@ -579,11 +1110,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontFamily: "raleway-400Regular",
   },
-  locationDropdown: {
-    flexDirection: "row",
-    alignItems: "center",
+  headerTitleContainer: {
+    flex: 1,
   },
-  locationRow: {
+  locationSelector: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -591,7 +1121,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#333333",
-    marginLeft: 4,
+    marginLeft: 8,
+    marginRight: 4,
     fontFamily: "raleway-500Medium",
   },
   headerIcons: {
@@ -601,6 +1132,24 @@ const styles = StyleSheet.create({
   iconButton: {
     marginLeft: 15,
   },
+  badge: {
+    position: "absolute",
+    right: -6,
+    top: -6,
+    backgroundColor: "#FF4444",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
   toggleContainer: {
     width: 40,
     height: 24,
@@ -609,11 +1158,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 2,
   },
+  toggleContainerInactive: {
+    backgroundColor: "#CCCCCC",
+  },
   toggleSwitch: {
     width: "100%",
     height: "100%",
     justifyContent: "center",
-    alignItems: "flex-end",
   },
   toggleThumb: {
     width: 20,
@@ -624,6 +1175,55 @@ const styles = StyleSheet.create({
   searchSection: {
     paddingHorizontal: 20,
     marginBottom: 25,
+  },
+  storiesContainer: {
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingVertical: 22,
+  },
+  storyCard: {
+    width: 118,
+    height: 188,
+    marginRight: 20,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#FF6B1A",
+    justifyContent: "space-between",
+    transform: [{ rotate: "-10deg" }],
+    shadowColor: "#FF6B1A",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  storyCardImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: undefined,
+    height: undefined,
+  },
+  storyCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255, 107, 26, 0.22)",
+  },
+  storyContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+  },
+  storyTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    lineHeight: 18,
+  },
+  storySubtitle: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.88)",
+  },
+  sectionCaption: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
   },
   filtersSection: {
     marginBottom: 30,
@@ -656,6 +1256,20 @@ const styles = StyleSheet.create({
     height: 40,
     resizeMode: "contain",
   },
+  allBrandItem: {
+    paddingHorizontal: 16,
+    minWidth: 70,
+  },
+  allBrandText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    fontFamily: "raleway-600SemiBold",
+  },
+  allBrandTextActive: {
+    color: "#FF8C42",
+    fontWeight: "700",
+  },
   section: {
     paddingHorizontal: 20,
     marginBottom: 30,
@@ -683,6 +1297,41 @@ const styles = StyleSheet.create({
   },
   bestPropertyCardMargin: {
     marginBottom: 15,
+  },
+  // View switch (shown for "both" users) — compact icon-only pill in header
+  viewSwitch: {
+    flexDirection: "row",
+    backgroundColor: "#F2F2F2",
+    borderRadius: 10,
+    padding: 3,
+    marginRight: 10,
+  },
+  switchTab: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  switchTabActive: {
+    backgroundColor: "#FF8C42",
+    shadowColor: "#FF8C42",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  switchIcon: {
+    marginRight: 2,
+  },
+  switchTabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#8A8A8A",
+    fontFamily: "raleway-500Medium",
+  },
+  switchTabTextActive: {
+    color: "#FFFFFF",
   },
   // Modal styles
   modalOverlay: {
@@ -734,5 +1383,69 @@ const styles = StyleSheet.create({
     color: "#FF8C42",
     fontWeight: "600",
     fontFamily: "raleway-500Medium",
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  // Empty State styles
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    paddingVertical: 80,
+    minHeight: 400,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333333",
+    marginBottom: 16,
+    fontFamily: "raleway-700Bold",
+    textAlign: "center",
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: "#999999",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 40,
+    fontFamily: "raleway-400Regular",
+  },
+  clearFiltersButton: {
+    width: "100%",
+    backgroundColor: "#FF8C42",
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    shadowColor: "#FF8C42",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  clearFiltersButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "raleway-600SemiBold",
+  },
+  browseAllButton: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FF8C42",
+  },
+  browseAllButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FF8C42",
+    fontFamily: "raleway-600SemiBold",
   },
 });

@@ -4,18 +4,28 @@
     "jsx": "react-jsx",
     "strict": true,
     "baseUrl": ".",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
-    "types": ["expo-router"]  // ← Critical for Stack types
+    "types": [
+      "expo-router"
+    ]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "app/**/*"  // ← Ensure app files are included
+    "app/**/*"
   ],
-  "exclude": ["node_modules", "src/**/*"]
-  
+  "exclude": [
+    "node_modules",
+    "src/**/*"
+  ]
 }

@@ -1,7 +1,7 @@
 import React, { memo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Image } from "expo-image";
-import { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 import { imagePreloader } from "../../services/imagePreloader";
 
 interface PropertyCardProps {
@@ -34,6 +34,8 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
     variant = "default",
     mode = "property",
   }) => {
+    const { t } = useTranslation();
+    
     if (variant === "best") {
       return (
         <TouchableOpacity
@@ -46,7 +48,13 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
             style={styles.bestPropertyImage}
           />
           <View style={styles.bestPropertyInfo}>
-            <Text style={styles.bestPropertyTitle}>{title}</Text>
+            <Text
+              style={styles.bestPropertyTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {title}
+            </Text>
             <Text style={styles.bestPropertyPrice}>{price}</Text>
             <View style={styles.bestPropertyFeatures}>
               {mode === "cars" ? (
@@ -54,7 +62,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
                   <View style={styles.bestFeature}>
                     <Image
                       {...imagePreloader.getOptimizedIconProps(
-                        require("../../assets/Icons/Car.png")
+                        require("../../assets/Icons/Car.png"),
                       )}
                       style={styles.featureIcon}
                     />
@@ -65,7 +73,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
                   <View style={styles.bestFeature}>
                     <Image
                       {...imagePreloader.getOptimizedIconProps(
-                        require("../../assets/Icons/Speed.png")
+                        require("../../assets/Icons/Speed.png"),
                       )}
                       style={styles.featureIcon}
                     />
@@ -79,11 +87,15 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
                   <View style={styles.bestFeature}>
                     <Image
                       {...imagePreloader.getOptimizedIconProps(
-                        require("../../assets/Icons/IC_Bed.png")
+                        require("../../assets/Icons/IC_Bed.png"),
                       )}
                       style={styles.featureIcon}
                     />
-                    <Text style={styles.bestFeatureText}>
+                    <Text
+                      style={styles.bestFeatureText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       <Text style={styles.numberText}>{bedrooms}</Text>{" "}
                       {bedrooms === 1
                         ? t("property.bedroom")
@@ -93,11 +105,15 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
                   <View style={styles.bestFeature}>
                     <Image
                       {...imagePreloader.getOptimizedIconProps(
-                        require("../../assets/Icons/IC_Bath.png")
+                        require("../../assets/Icons/IC_Bath.png"),
                       )}
                       style={styles.featureIcon}
                     />
-                    <Text style={styles.bestFeatureText}>
+                    <Text
+                      style={styles.bestFeatureText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       <Text style={styles.numberText}>{bathrooms}</Text>{" "}
                       {bathrooms === 1
                         ? t("property.bathroom")
@@ -141,13 +157,61 @@ export const PropertyCard: React.FC<PropertyCardProps> = memo(
             <View style={styles.overlayContent}>
               <Text style={styles.overlayAddress}>{address}</Text>
               <Text style={styles.overlayArea}>{area}</Text>
-              <View style={styles.overlayFeatures}></View>
+              <View style={styles.overlayFeatures}>
+                {mode === "cars" ? (
+                  <>
+                    <View style={styles.overlayFeature}>
+                      <Image
+                        {...imagePreloader.getOptimizedIconProps(
+                          require("../../assets/Icons/Car.png"),
+                        )}
+                        style={{ width: 14, height: 14, tintColor: "#FFFFFF" }}
+                      />
+                      <Text style={styles.overlayFeatureText}>
+                        {bedrooms} kW
+                      </Text>
+                    </View>
+                    <View style={[styles.overlayFeature, { marginLeft: 8 }]}>
+                      <Image
+                        {...imagePreloader.getOptimizedIconProps(
+                          require("../../assets/Icons/Speed.png"),
+                        )}
+                        style={{ width: 14, height: 14, tintColor: "#FFFFFF" }}
+                      />
+                      <Text style={styles.overlayFeatureText}>
+                        {bathrooms} km/h
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.overlayFeature}>
+                      <Image
+                        {...imagePreloader.getOptimizedIconProps(
+                          require("../../assets/Icons/IC_Bed.png"),
+                        )}
+                        style={{ width: 14, height: 14, tintColor: "#FFFFFF" }}
+                      />
+                      <Text style={styles.overlayFeatureText}>{bedrooms}</Text>
+                    </View>
+                    <View style={[styles.overlayFeature, { marginLeft: 8 }]}>
+                      <Image
+                        {...imagePreloader.getOptimizedIconProps(
+                          require("../../assets/Icons/IC_Bath.png"),
+                        )}
+                        style={{ width: 14, height: 14, tintColor: "#FFFFFF" }}
+                      />
+                      <Text style={styles.overlayFeatureText}>{bathrooms}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
           </View>
         </View>
       </TouchableOpacity>
     );
-  }
+  },
 );
 
 PropertyCard.displayName = "PropertyCard";
@@ -158,6 +222,15 @@ const styles = StyleSheet.create({
   propertyCard: {
     marginRight: 15,
     width: 180, // Reduced width from 220 to 180
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   propertyImageContainer: {
     position: "relative",
@@ -166,7 +239,7 @@ const styles = StyleSheet.create({
   propertyImage: {
     width: 180, // Reduced width from 220 to 180
     height: 200, // Increased height from 160 to 200
-    borderRadius: 15,
+    borderRadius: 16,
   },
   // Distance indicator in top-right corner
   distanceIndicator: {
@@ -182,7 +255,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#FFFFFF",
     fontWeight: "500",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
   // Overlay styles for property info on image
   propertyInfoOverlay: {
@@ -191,8 +264,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 80, // Fixed height for the overlay area
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     overflow: "hidden",
   },
   shadowImage: {
@@ -250,7 +323,7 @@ const styles = StyleSheet.create({
   propertyPrice: {
     fontSize: 18,
     fontWeight: "bold",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
     color: "#333333",
     marginBottom: 4,
   },
@@ -282,14 +355,22 @@ const styles = StyleSheet.create({
   },
   bestPropertyCard: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    borderRadius: 18,
     marginBottom: 15,
     padding: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   bestPropertyImage: {
     width: 100,
     height: 100,
-    borderRadius: 15,
+    borderRadius: 14,
     marginLeft: -15,
     marginRight: 15,
   },
@@ -304,29 +385,33 @@ const styles = StyleSheet.create({
     fontFamily: "raleway-500Medium",
     color: "#333333",
     marginBottom: 8,
+    flexShrink: 1,
   },
   bestPropertyPrice: {
     fontSize: 16,
     fontWeight: "600",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-600SemiBold",
     color: "#FF8C42",
     marginBottom: 12,
   },
   bestPropertyFeatures: {
     flexDirection: "row",
-    gap: 20,
+    gap: 12,
+    alignItems: "center",
   },
   bestFeature: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   bestFeatureText: {
     marginLeft: 6,
-    fontSize: 14,
+    fontSize: 13,
     color: "#8A8A8A",
     fontWeight: "400",
     fontFamily: "raleway-400Regular",
-    marginRight: -5,
+    flexShrink: 1,
+    numberOfLines: 1,
   },
   featureIcon: {
     width: 24,
@@ -334,7 +419,7 @@ const styles = StyleSheet.create({
     tintColor: "#8A8A8A",
   },
   numberText: {
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
   carIconWrapper: {
     width: 30,

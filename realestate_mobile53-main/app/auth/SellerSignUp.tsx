@@ -1,34 +1,35 @@
-﻿import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useState } from "react";
 import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   FloatingLabelInput,
-  PrimaryButton,
   FormSeparator,
+  PrimaryButton,
   SecondaryButton,
   TabNavigation,
 } from "../../components/Ui";
 import { Colors } from "../../components/styles";
-import { useAuth } from "../../contexts/AuthContext";
 import { useInterest } from "../../contexts/InterestContext";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
+
+const PENDING_SELLER_SIGNUP_KEY = "pending_seller_signup_kyc";
 
 interface FormData {
   fullName: string;
   email: string;
   phoneNumber: string;
   password: string;
-  confirmPassword: string; // Add this for validation
-  bankAccount: string;
+  confirmPassword: string;
   city: string;
 }
 
@@ -37,38 +38,27 @@ interface FormErrors {
   email?: string;
   phoneNumber?: string;
   password?: string;
-  confirmPassword?: string; // Add this
-  bankAccount?: string;
+  confirmPassword?: string;
   city?: string;
 }
 
 const SellerSignUpScreen = () => {
   const router = useRouter();
   const { interest } = useLocalSearchParams<{ interest: string }>();
-  const { registerPhone, isLoading, clearError } = useAuth();
   const { setUserPreferences } = useInterest();
+  const { t } = useTranslation();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("signup");
+  const [isPreparingKyc, setIsPreparingKyc] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
     phoneNumber: "",
     password: "",
     confirmPassword: "",
-    bankAccount: "",
     city: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [locale, setLocale] = useState(i18n.locale);
-
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-    return () => clearInterval(checkLocale);
-  }, [locale]);
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -96,7 +86,7 @@ const SellerSignUpScreen = () => {
 
     if (!formData.password) {
       newErrors.password = t("validation.passwordRequired");
-    } else if (formData.password.length < 6) {
+    } else if (formData.password.length < 8) {
       newErrors.password = t("validation.passwordTooShort");
     }
 
@@ -104,10 +94,6 @@ const SellerSignUpScreen = () => {
       newErrors.confirmPassword = t("validation.confirmPasswordRequired");
     } else if (formData.confirmPassword !== formData.password) {
       newErrors.confirmPassword = t("validation.passwordsNotMatch");
-    }
-
-    if (!formData.bankAccount.trim()) {
-      newErrors.bankAccount = t("validation.bankAccountRequired");
     }
 
     if (!formData.city.trim()) {
@@ -119,65 +105,44 @@ const SellerSignUpScreen = () => {
   };
 
   const handleSignUp = async () => {
-    if (validateForm()) {
-      try {
-        clearError();
+    if (!validateForm()) {
+      return;
+    }
 
-        // Save user interest and role using InterestContext
-        const userInterest = (interest || "property") as "property" | "cars";
-        const userRole = "seller"; // Always seller for this signup flow
-        await setUserPreferences(userInterest, userRole);
+    try {
+      setIsPreparingKyc(true);
 
-        // Split full name into first and last name
-        const nameParts = formData.fullName.trim().split(" ");
-        const firstName = nameParts[0];
-        const lastName = nameParts.slice(1).join(" ") || "";
+      const userInterest = (interest || "property") as "property" | "cars";
+      await setUserPreferences(userInterest, "seller");
 
-        const registrationData = {
+      const nameParts = formData.fullName.trim().split(" ");
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      await AsyncStorage.setItem(
+        PENDING_SELLER_SIGNUP_KEY,
+        JSON.stringify({
           phoneNumber: formData.phoneNumber,
-          email: formData.email, // Required for email verification since SMS is not available
+          email: formData.email,
           password: formData.password,
           confirmPassword: formData.confirmPassword,
           firstName,
           lastName,
-          userType: "seller" as const,
-          interest: userInterest, // Send interest to backend
-        };
+          city: formData.city,
+          userType: "seller",
+          interest: userInterest,
+        })
+      );
 
-        const result = await registerPhone(registrationData);
-
-        if (result.needsVerification) {
-          // Show success message and inform user to check email
-          Alert.alert(
-            "Registration Successful!",
-            `A verification link has been sent to ${formData.email}. Please check your email to verify your account.`,
-            [
-              {
-                text: "OK",
-                onPress: () => {
-                  // Navigate to a verification pending screen or back to login
-                  router.push("/auth/SignIn");
-                },
-              },
-            ]
-          );
-        }
-      } catch (err: any) {
-        Alert.alert(
-          "Registration Failed",
-          err.message ||
-            "An error occurred during registration. Please try again."
-        );
-      }
+      router.push("./KycVerification");
+    } catch (err: any) {
+      Alert.alert(
+        "Unable to Continue",
+        err.message || "We couldn't open the verification step. Please try again."
+      );
+    } finally {
+      setIsPreparingKyc(false);
     }
-  };
-
-  const handleGoogleSignUp = () => {
-    console.log("Google Sign Up for Seller");
-  };
-
-  const handleAppleSignUp = () => {
-    console.log("Apple Sign Up for Seller");
   };
 
   const tabOptions = [
@@ -193,7 +158,6 @@ const SellerSignUpScreen = () => {
     },
   ];
 
-  // Function to render the appropriate image based on interest selection
   const renderInterestImage = () => {
     if (interest === "cars") {
       return (
@@ -205,7 +169,9 @@ const SellerSignUpScreen = () => {
           />
         </View>
       );
-    } else if (interest === "property") {
+    }
+
+    if (interest === "property") {
       return (
         <View style={styles.imageContainer}>
           <Image
@@ -217,7 +183,6 @@ const SellerSignUpScreen = () => {
       );
     }
 
-    // Default fallback
     return (
       <View style={styles.imageContainer}>
         <Image
@@ -241,12 +206,9 @@ const SellerSignUpScreen = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Dynamic Image Based on Interest Selection */}
         {renderInterestImage()}
 
-        <Text style={styles.title}>
-          {t("authentication.sellerSignUpTitle")}
-        </Text>
+        <Text style={styles.title}>{t("authentication.sellerSignUpTitle")}</Text>
 
         <TabNavigation
           tabs={tabOptions}
@@ -263,6 +225,8 @@ const SellerSignUpScreen = () => {
             placeholder={t("authentication.enterFullName")}
             error={errors.fullName}
             style={styles.inputStyle}
+            important
+            accessibilityLabel="Full Name Input"
           />
 
           <FloatingLabelInput
@@ -274,6 +238,8 @@ const SellerSignUpScreen = () => {
             autoCapitalize="none"
             error={errors.email}
             style={styles.inputStyle}
+            important
+            accessibilityLabel="Email Input"
           />
 
           <FloatingLabelInput
@@ -284,6 +250,8 @@ const SellerSignUpScreen = () => {
             keyboardType="phone-pad"
             error={errors.phoneNumber}
             style={styles.inputStyle}
+            important
+            accessibilityLabel="Phone Number Input"
           />
 
           <FloatingLabelInput
@@ -297,6 +265,8 @@ const SellerSignUpScreen = () => {
             onPasswordToggle={() => setPasswordVisible(!passwordVisible)}
             error={errors.password}
             style={styles.inputStyle}
+            important
+            accessibilityLabel="Password Input"
           />
 
           <FloatingLabelInput
@@ -307,15 +277,8 @@ const SellerSignUpScreen = () => {
             secureTextEntry
             error={errors.confirmPassword}
             style={styles.inputStyle}
-          />
-
-          <FloatingLabelInput
-            label={t("authentication.bankAccount")}
-            value={formData.bankAccount}
-            onChangeText={(value) => updateFormData("bankAccount", value)}
-            placeholder={t("authentication.enterBankAccount")}
-            error={errors.bankAccount}
-            style={styles.inputStyle}
+            important
+            accessibilityLabel="Confirm Password Input"
           />
 
           <FloatingLabelInput
@@ -325,17 +288,15 @@ const SellerSignUpScreen = () => {
             placeholder={t("authentication.enterCity")}
             error={errors.city}
             style={styles.inputStyle}
+            important
+            accessibilityLabel="City Input"
           />
         </View>
 
         <PrimaryButton
-          title={
-            isLoading
-              ? t("authentication.creatingAccount")
-              : t("authentication.createAccount")
-          }
+          title={isPreparingKyc ? t("authentication.loading") : "Continue to verification"}
           onPress={handleSignUp}
-          disabled={isLoading}
+          disabled={isPreparingKyc}
           style={styles.createAccountButton}
         />
 
@@ -343,16 +304,18 @@ const SellerSignUpScreen = () => {
 
         <SecondaryButton
           title={t("authentication.google")}
-          onPress={handleGoogleSignUp}
+          onPress={() => console.log("Google Sign Up for Seller")}
           icon={require("../../assets/images/Auth/Google.png")}
-          style={styles.socialButton}
+          style={styles.disabledSocialButton}
+          disabled={true}
         />
 
         <SecondaryButton
           title={t("authentication.apple")}
-          onPress={handleAppleSignUp}
+          onPress={() => console.log("Apple Sign Up for Seller")}
           icon={require("../../assets/images/Auth/Apple_Logo.png")}
-          style={styles.socialButton}
+          style={styles.disabledSocialButton}
+          disabled={true}
         />
 
         <View style={styles.bottomSpacing} />
@@ -373,22 +336,6 @@ const styles = StyleSheet.create({
   imageContainer: {
     alignItems: "center",
   },
-  carImagePlaceholder: {
-    width: 300,
-    height: 300,
-    backgroundColor: Colors.backgroundLight,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  carImageText: {
-    fontSize: 60,
-  },
-  carImage: {
-    width: 180,
-    height: 120,
-    marginBottom: 10,
-  },
   interestImage: {
     width: 300,
     height: 300,
@@ -407,11 +354,10 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   formContainer: {
-    paddingHorizontal: 20,
-    gap: 20,
+    marginHorizontal: 20,
   },
   inputStyle: {
-    marginBottom: 0,
+    marginBottom: 16,
   },
   createAccountButton: {
     marginHorizontal: 20,
@@ -425,6 +371,11 @@ const styles = StyleSheet.create({
   socialButton: {
     marginHorizontal: 20,
     marginBottom: 16,
+  },
+  disabledSocialButton: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    opacity: 0.6,
   },
   bottomSpacing: {
     height: 20,

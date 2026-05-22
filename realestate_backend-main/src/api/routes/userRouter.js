@@ -1,7 +1,11 @@
 const router = require("express").Router();
 const userCtrl = require("../controllers/userController");
-const auth = require("../middleware/auth");
+const followCtrl = require("../controllers/followController");
+const { auth } = require("../middleware/auth");
 const { upload } = require("../utils/multer");
+// Pack purchase/upgrade endpoint
+router.post('/purchase-pack', auth, userCtrl.purchasePack);
+router.post('/start-trial', auth, userCtrl.startTrial);
 
 // Complete Profile Route (handles avatar + full info)
 router.post(
@@ -12,8 +16,10 @@ router.post(
 );
 
 // Profile management
-router.get('/profile', auth, userCtrl.getProfile);          // GET profile
-router.put('/profile', auth, userCtrl.updateBasicProfile);  // Basic info only
+router.get('/profile', auth, userCtrl.getProfile);          // GET own profile
+router.get('/profile/:id', userCtrl.getPublicProfile);     // GET any user's public profile
+router.put('/profile', auth, upload.single('avatar'), userCtrl.updateBasicProfile);  // Basic info + avatar
+router.put('/change-password', auth, userCtrl.changePassword); // Change password
 router.put('/preferences', auth, userCtrl.updatePreferences);  // Preferences only
 router.post(
   '/upload-avatar',
@@ -24,7 +30,7 @@ router.post(
 
 // Listings management - separated by type
 router.get('/listings/properties', auth, userCtrl.getUserPropertyListings);
-router.get('/listings/vehicles', auth, userCtrl.getUserVehicleListings);
+router.get('/listings/vehic  les', auth, userCtrl.getUserVehicleListings);
 
 // Favorites system - separated by type
 router.get('/favorites/properties', auth, userCtrl.getFavoriteProperties);
@@ -36,5 +42,10 @@ router.post('/favorites/vehicles/:vehicleId', auth, userCtrl.addFavoriteVehicle)
 
 router.delete('/favorites/properties/:propertyId', auth, userCtrl.removeFavoriteProperty);
 router.delete('/favorites/vehicles/:vehicleId', auth, userCtrl.removeFavoriteVehicle);
+
+// Follow system
+router.post('/:userId/follow', auth, followCtrl.followUser);
+router.delete('/:userId/follow', auth, followCtrl.unfollowUser);
+router.get('/:userId/follow-status', auth, followCtrl.getFollowStatus);
 
 module.exports = router;

@@ -11,14 +11,25 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { PrimaryButton, BackButton } from "../../components/Ui";
 import { Colors } from "../../components/styles";
+import { authService } from "../../services/authService";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const OTPVerificationScreen = () => {
   const router = useRouter();
-  const { phoneNumber } = useLocalSearchParams<{ phoneNumber: string }>();
+  const { t } = useTranslation();
+  const params = useLocalSearchParams<{ 
+    phoneNumber?: string, 
+    method?: string, 
+    contact?: string, 
+    isRecovery?: string 
+  }>();
 
+  const contact = params.contact || params.phoneNumber || "";
+  const isRecovery = params.isRecovery === "true";
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [countdown, setCountdown] = useState(24);
   const [canResend, setCanResend] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Countdown Timer
@@ -70,20 +81,55 @@ const OTPVerificationScreen = () => {
     }
   };
 
-  const handleResendCode = () => {
+  const handleResendCode = async () => {
     if (canResend) {
-      setCountdown(24);
-      setCanResend(false);
-      console.log("Resending OTP to:", phoneNumber);
-      // Add resend logic here
+      try {
+        setIsLoading(true);
+        const result = await authService.resendOTP(contact);
+        if (result.success) {
+          setCountdown(24);
+          setCanResend(false);
+        }
+      } catch (error: any) {
+        console.error("Resend OTP Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const otpCode = otp.join("");
     if (otpCode.length === 6) {
-      console.log("OTP Entered:", otpCode);
-      router.push("../(tabs)");
+      setIsLoading(true);
+      try {
+        if (isRecovery) {
+          // If it's recovery, we navigate to ResetPassword with the code
+          router.push({
+            pathname: "./ResetPassword",
+            params: {
+              contact: contact,
+              otp: otpCode,
+              method: params.method || "email",
+              verified: "true"
+            }
+          });
+        } else {
+          // Regular phone verification
+          const result = await authService.verifyOTP({
+            phoneNumber: contact,
+            otp: otpCode
+          });
+
+          if (result.success) {
+            router.push("../(tabs)");
+          }
+        }
+      } catch (error: any) {
+        console.error("OTP Verification Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -98,10 +144,10 @@ const OTPVerificationScreen = () => {
 
       {/* Content */}
       <View style={styles.content}>
-        <Text style={styles.title}>Enter the Code</Text>
+        <Text style={styles.title}>{t("authentication.enterCode")}</Text>
         <Text style={styles.subtitle}>
-          A verification code has been sent to{"\n"}
-          {phoneNumber || "+216 99 999 999"}
+          {t("authentication.verificationSentTo")}{"\n"}
+          {contact || "+216 99 999 999"}
         </Text>
 
         {/* OTP Input Circles */}
@@ -133,19 +179,20 @@ const OTPVerificationScreen = () => {
         {/* Resend Timer */}
         <Text style={styles.resendText}>
           {canResend ? (
-            <TouchableOpacity onPress={handleResendCode}>
-              <Text style={styles.resendLink}>Resend the code</Text>
+            <TouchableOpacity onPress={handleResendCode} disabled={isLoading}>
+              <Text style={styles.resendLink}>{t("authentication.resendCode")}</Text>
             </TouchableOpacity>
           ) : (
-            `You can resend the code in ${countdown} seconds`
+            t("authentication.canResendIn").replace("{seconds}", countdown.toString())
           )}
         </Text>
       </View>
 
       {/* Next Button */}
       <PrimaryButton
-        title="Next"
+        title={isLoading ? t("authentication.loading") : t("authentication.next")}
         onPress={handleNext}
+        disabled={isLoading || !isOtpComplete}
         style={styles.nextButton}
       />
 

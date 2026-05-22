@@ -1,3 +1,12 @@
+// Stub for unlockVehicleMedia
+exports.unlockVehicleMedia = async (req, res) => {
+  // Implement your logic here
+  return res.status(200).json({
+    success: true,
+    message: 'unlockVehicleMedia endpoint is not yet implemented.'
+  });
+};
+const Availability = require("../models/availabilityModel");
 const Vehicle = require("../models/vehicleModel");
 const User = require("../models/userModel");
 const fs = require("fs");
@@ -11,6 +20,123 @@ const handleError = (res, error, statusCode = 400) => {
     message: error.message
   });
 };
+
+const PACK_LIMITS = {
+  freemium: 1,
+  bronze: 3,
+  silver: 10,
+  gold: 15,
+  platinum: 50,
+};
+
+const BOOST_PLANS = {
+  '1day': { duration: 1, cost: 1, label: '1 day boost', visibility: 'Top of search' },
+  '3day': { duration: 3, cost: 1, label: '3 day boost', visibility: 'Top of search' },
+  '7day': { duration: 7, cost: 1, label: '7 day boost', visibility: 'Top of search' },
+};
+
+const isPromotionCurrentlyActive = (item) => {
+  if (!item?.isPromoted || !item?.promotionExpiry) {
+    return false;
+  }
+
+  return new Date(item.promotionExpiry).getTime() > Date.now();
+};
+
+const clearExpiredVehiclePromotions = async () => {
+  await Vehicle.updateMany(
+    {
+      isPromoted: true,
+      promotionExpiry: { $lte: new Date() },
+    },
+    {
+      $set: {
+        isPromoted: false,
+        boostPlan: null,
+      },
+      $unset: {
+        promotionExpiry: 1,
+      },
+    },
+  );
+};
+
+const formatVehicleResponse = (vehicle, currentUserId) => {
+  if (!vehicle) return null;
+
+  // Convert mongoose document to object if needed
+  const vehicleObj = vehicle.toObject ? vehicle.toObject() : vehicle;
+
+  // Helper function to convert relative paths to full URLs
+  const toFullUrl = (path) => {
+    if (!path) return path;
+    const baseUrl = process.env.API_URL || 'http://172.20.10.6:3000';
+
+    if (path.startsWith('http')) {
+      try {
+        const url = new URL(path);
+        let pathname = url.pathname;
+
+        // Check if it's our local media
+        const isLocalMedia = pathname.startsWith('/uploads') || pathname.startsWith('/images-users');
+        
+        if (isLocalMedia) {
+          // Fix potentially broken paths (e.g. /uploads/filename.jpg instead of /uploads/vehicles/images/filename.jpg)
+          if (pathname.startsWith('/uploads/') && !pathname.includes('/properties/') && !pathname.includes('/vehicles/')) {
+            // For vehicles, we check the context or just default to properties if ambiguous, but here it's vehiclesController
+            pathname = `/uploads/vehicles/images${pathname.replace('/uploads', '')}`;
+          }
+          // Return fresh URL with current baseUrl
+          return `${baseUrl}${pathname.startsWith('/') ? pathname : '/' + pathname}`;
+        }
+      } catch (err) {
+        // Fallback for invalid URLs
+      }
+      return path;
+    }
+
+    // Clean relative path
+    let cleanPath = path.startsWith('/') ? path.substring(1) : path;
+
+    // Check for missing prefix
+    const hasUploadsPrefix = cleanPath.startsWith('uploads/') || cleanPath.startsWith('images-users/');
+    if (!hasUploadsPrefix) {
+      // Default to vehicle images if no prefix
+      return `${baseUrl}/uploads/vehicles/images/${cleanPath}`;
+    }
+
+    return `${baseUrl}/${cleanPath}`;
+  };
+
+  const allImages = vehicleObj.media?.images?.map(toFullUrl) || [];
+  const allVideos = vehicleObj.media?.videos?.map(toFullUrl) || [];
+  const allDocs = vehicleObj.media?.documents?.map(toFullUrl) || [];
+
+  // Determine if media is locked
+  const ownerId = vehicleObj.owner && (vehicleObj.owner._id || vehicleObj.owner);
+  const isOwner = !!(currentUserId && ownerId && String(ownerId) === String(currentUserId));
+  const media = {
+    images: allImages,
+    videos: allVideos,
+    documents: allDocs,
+    totalImagesCount: allImages.length,
+    totalVideosCount: allVideos.length,
+    hasVideo: allVideos.length > 0,
+    isLocked: false
+  };
+
+  return {
+    ...vehicleObj,
+    owner: vehicleObj.owner,
+    media: media,
+    isLocked: false,
+    isPromoted: isPromotionCurrentlyActive(vehicleObj),
+    promotionExpiry: isPromotionCurrentlyActive(vehicleObj) ? vehicleObj.promotionExpiry : null,
+    boostPlan: isPromotionCurrentlyActive(vehicleObj) ? vehicleObj.boostPlan || null : null,
+  };
+};
+
+exports.formatVehicleResponse = formatVehicleResponse;
 
 const validateVehicleData = (data) => {
   const errors = [];
@@ -89,7 +215,27 @@ const validatePricing = (listingType, pricing) => {
 exports.createVehicle = async (req, res) => {
   try {
     console.log('📝 Creating vehicle with data:', JSON.stringify(req.body, null, 2));
-    
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userPack = user.pack || 'freemium';
+    const maxListings = user.listingConfig?.number || PACK_LIMITS[userPack] || 1;
+    const currentListings = (user.propertyListings?.length || 0) + (user.vehicleListings?.length || 0);
+
+    if (currentListings >= maxListings) {
+      return res.status(403).json({
+        success: false,
+        message: `Your current pack ('${userPack}') allows posting up to ${maxListings} listings. Upgrade your pack to add more listings.`,
+      });
+    }
+
     // Validate vehicle data
     validateVehicleData(req.body);
 
@@ -104,7 +250,6 @@ exports.createVehicle = async (req, res) => {
     };
 
     // If location coordinates are provided, use them
-    // Otherwise, this will be set when user submits with their current location
     if (location && location.coordinates) {
       vehicleData.location = {
         ...location,
@@ -131,46 +276,53 @@ exports.createVehicle = async (req, res) => {
 
     console.log('✅ Vehicle data validated, creating in database...');
     const vehicle = await Vehicle.create(vehicleData);
-    
+
     console.log('✅ Vehicle created successfully:', vehicle._id);
-    
+
+    // Auto-create Availability document for this vehicle
+    try {
+      await Availability.create({
+        listingType: 'vehicle',
+        listingId: vehicle._id,
+        owner: req.user.id,
+        defaultAvailable: true,
+        availableRanges: [],
+        blockedRanges: [],
+        bookedRanges: [],
+        minRentalDays: 1,
+      });
+      console.log(`📅 Auto-created Availability for vehicle: ${vehicle._id}`);
+    } catch (availErr) {
+      console.warn('⚠️ Could not auto-create Availability for vehicle:', availErr.message);
+    }
+
+    // Add vehicle to user's vehicleListings array
+    await User.findByIdAndUpdate(
+      req.user.id,
+      { $push: { vehicleListings: vehicle._id } },
+      { new: true }
+    );
+    console.log('✅ Vehicle added to user vehicleListings');
+
     // Populate owner information before sending response
     const populatedVehicle = await Vehicle.findById(vehicle._id)
       .populate('owner', 'name email phone');
 
     res.status(201).json({
       success: true,
-      message: 'Vehicle created successfully',
-      data: populatedVehicle
+      message: req.t('vehicleCreated'),
+      data: formatVehicleResponse(populatedVehicle, req.user?.id)
     });
   } catch (error) {
     console.error('❌ Error creating vehicle:', error);
-    
-    // Handle validation errors
-    if (error.errors && Array.isArray(error.errors)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: error.errors
-      });
-    }
-    
-    // Handle mongoose validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors
-      });
-    }
-    
     handleError(res, error);
   }
 };
 
 exports.getVehicle = async (req, res) => {
   try {
+    await clearExpiredVehiclePromotions();
+
     // Increment views
     await Vehicle.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
 
@@ -181,13 +333,13 @@ exports.getVehicle = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
 
     res.status(200).json({
       success: true,
-      data: vehicle
+      data: formatVehicleResponse(vehicle, req.user?.id)
     });
   } catch (error) {
     handleError(res, error);
@@ -210,13 +362,21 @@ exports.updateVehicle = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
+    }
+
+    // Sync Availability.defaultAvailable if availability.isAvailable changed
+    if (req.body.availability?.isAvailable !== undefined) {
+      await Availability.findOneAndUpdate(
+        { listingType: 'vehicle', listingId: req.params.id },
+        { defaultAvailable: req.body.availability.isAvailable }
+      ).catch(err => console.warn('⚠️ Could not sync Availability on vehicle update:', err.message));
     }
 
     res.status(200).json({
       success: true,
-      data: vehicle
+      data: formatVehicleResponse(vehicle, req.user?.id)
     });
   } catch (error) {
     handleError(res, error);
@@ -230,9 +390,17 @@ exports.deleteVehicle = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
+
+    // Remove vehicle from user's vehicleListings array
+    await User.findByIdAndUpdate(
+      vehicle.owner,
+      { $pull: { vehicleListings: req.params.id } },
+      { new: true }
+    );
+    console.log('✅ Vehicle removed from user vehicleListings');
 
     // Delete associated media files
     ['images', 'videos', 'documents'].forEach(type => {
@@ -247,7 +415,7 @@ exports.deleteVehicle = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Vehicle deleted successfully"
+      message: req.t('vehicleDeleted')
     });
   } catch (error) {
     handleError(res, error);
@@ -257,38 +425,47 @@ exports.deleteVehicle = async (req, res) => {
 // Vehicle Media Operations
 exports.addMedia = async (req, res) => {
   try {
+    console.log('📤 addMedia - Vehicle ID:', req.params.id);
+    console.log('📤 Files received:', req.files ? req.files.length : 0);
+
     const vehicle = await Vehicle.findById(req.params.id);
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound') || 'Vehicle not found'
       });
     }
 
-    const mediaUpdates = {};
-    const mediaTypes = ['images', 'videos', 'documents'];
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+    }
 
-    mediaTypes.forEach(type => {
-      if (req.files[type]) {
-        const urls = req.files[type].map(file => 
-          `/uploads/vehicles/${type}/${file.filename}`
-        );
-        mediaUpdates[`media.${type}`] = { $each: urls };
-      }
+    // Process uploaded files - all files come as array in req.files
+    const imageUrls = req.files.map(file => {
+      // Return relative path that will be converted to full URL by formatVehicleResponse
+      return `/uploads/vehicles/images/${file.filename}`;
     });
 
-    const updatedVehicle = await Vehicle.findByIdAndUpdate(
-      req.params.id,
-      { $push: mediaUpdates },
-      { new: true }
-    );
+    console.log('✅ Image URLs:', imageUrls);
+
+    // Add images to vehicle
+    vehicle.media.images.push(...imageUrls);
+    await vehicle.save();
+
+    console.log('✅ Vehicle media updated successfully');
 
     res.status(200).json({
       success: true,
-      data: updatedVehicle.media
+      data: vehicle.media,
+      message: 'Images uploaded successfully'
     });
   } catch (error) {
-    handleError(res, error);
+    console.error('❌ Error in addMedia:', error);
+    handleError(res, error, 500);
   }
 };
 
@@ -300,7 +477,7 @@ exports.removeMedia = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
 
@@ -308,7 +485,7 @@ exports.removeMedia = async (req, res) => {
     if (!mediaItem) {
       return res.status(404).json({
         success: false,
-        message: "Media not found"
+        message: req.t('mediaNotFound')
       });
     }
 
@@ -324,7 +501,7 @@ exports.removeMedia = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Media removed successfully"
+      message: req.t('mediaRemoved')
     });
   } catch (error) {
     handleError(res, error);
@@ -338,14 +515,14 @@ exports.likeVehicle = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
 
     if (vehicle.likes.includes(req.user.id)) {
       return res.status(400).json({
         success: false,
-        message: "Vehicle already liked"
+        message: req.t('vehicleAlreadyLiked')
       });
     }
 
@@ -367,7 +544,7 @@ exports.unlikeVehicle = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
 
@@ -375,7 +552,7 @@ exports.unlikeVehicle = async (req, res) => {
     if (likeIndex === -1) {
       return res.status(400).json({
         success: false,
-        message: "Vehicle not liked"
+        message: req.t('vehicleNotLiked')
       });
     }
 
@@ -394,65 +571,213 @@ exports.unlikeVehicle = async (req, res) => {
 // Search and Availability
 exports.searchVehicles = async (req, res) => {
   try {
-    const { 
-      type, 
-      make, 
-      model, 
-      minYear, 
-      maxYear, 
-      minPrice, 
-      maxPrice, 
+    await clearExpiredVehiclePromotions();
+
+    const {
+      type,
+      listingType,
+      make,
+      model,
+      minYear,
+      maxYear,
+      minPrice,
+      maxPrice,
       fuelType,
       transmission,
       location,
       keyword,
+      status = 'active',
       page = 1,
       limit = 10
     } = req.query;
 
-    const query = {};
-    
+    const query = { status };
+    const andConditions = [];
+
     if (type) query.type = type;
-    if (make) query['vehicleDetails.make'] = new RegExp(make, 'i');
-    if (model) query['vehicleDetails.model'] = new RegExp(model, 'i');
+    if (listingType) query.listingType = listingType;
+    
+    // Enhanced make search - check both make and model fields (in case data was entered incorrectly)
+    if (make) {
+      andConditions.push({
+        $or: [
+          { 'vehicleDetails.make': new RegExp(make, 'i') },
+          { 'vehicleDetails.model': new RegExp(make, 'i') }
+        ]
+      });
+    }
+    
+    if (model && !make) {
+      query['vehicleDetails.model'] = new RegExp(model, 'i');
+    }
+    
     if (minYear || maxYear) {
       query['vehicleDetails.year'] = {};
       if (minYear) query['vehicleDetails.year'].$gte = Number(minYear);
       if (maxYear) query['vehicleDetails.year'].$lte = Number(maxYear);
     }
-    if (fuelType) query['vehicleDetails.fuelType'] = fuelType;
-    if (transmission) query['vehicleDetails.transmission'] = transmission;
-    if (location) query['location.city'] = new RegExp(location, 'i');
+    if (fuelType) {
+      const fuelArray = Array.isArray(fuelType) ? fuelType : fuelType.split(',');
+      query['vehicleDetails.fuelType'] = { $in: fuelArray };
+    }
+    if (transmission) {
+      const transArray = Array.isArray(transmission) ? transmission : transmission.split(',');
+      query['vehicleDetails.transmission'] = { $in: transArray };
+    }
+    if (location) {
+      query['location.city'] = new RegExp(location, 'i');
+    }
 
-    if (minPrice || maxPrice) {
-      const priceField = req.query.listingType === 'rent' ? 'pricing.rentPrice' : 'pricing.salePrice';
-      query[priceField] = {};
-      if (minPrice) query[priceField].$gte = Number(minPrice);
-      if (maxPrice) query[priceField].$lte = Number(maxPrice);
+    // Handle pricing filters
+    if (listingType) {
+      const priceField = listingType === 'rent' ? 'pricing.rentPrice' : 'pricing.salePrice';
+      if (minPrice || maxPrice) {
+        query[priceField] = {};
+        if (minPrice) query[priceField].$gte = Number(minPrice);
+        if (maxPrice) query[priceField].$lte = Number(maxPrice);
+      }
+    } else if (minPrice || maxPrice) {
+      andConditions.push({
+        $or: [
+          { 'pricing.salePrice': { $gte: Number(minPrice || 0), $lte: Number(maxPrice || 1000000) } },
+          { 'pricing.rentPrice': { $gte: Number(minPrice || 0), $lte: Number(maxPrice || 1000000) } }
+        ]
+      });
     }
 
     if (keyword) {
-      query.$or = [
-        { title: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } },
-        { 'vehicleDetails.make': { $regex: keyword, $options: 'i' } },
-        { 'vehicleDetails.model': { $regex: keyword, $options: 'i' } }
-      ];
+      andConditions.push({
+        $or: [
+          { title: { $regex: keyword, $options: 'i' } },
+          { description: { $regex: keyword, $options: 'i' } },
+          { 'vehicleDetails.make': { $regex: keyword, $options: 'i' } },
+          { 'vehicleDetails.model': { $regex: keyword, $options: 'i' } }
+        ]
+      });
     }
 
+    // Combine all conditions
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
+    }
+
+    console.log('🔍 Vehicle search query:', JSON.stringify(query, null, 2));
+
     const vehicles = await Vehicle.find(query)
-      .skip((page - 1) * limit)
-      .limit(limit)
+      .sort({ isPromoted: -1, promotionExpiry: -1, createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit))
       .populate('owner', 'name phone');
 
     const total = await Vehicle.countDocuments(query);
+
+    console.log(`✅ Found ${vehicles.length} vehicles (total: ${total})`);
 
     res.status(200).json({
       success: true,
       count: vehicles.length,
       total,
-      pages: Math.ceil(total / limit),
-      data: vehicles
+      pages: Math.ceil(total / Number(limit)),
+      data: vehicles.map(v => formatVehicleResponse(v, req.user?.id))
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+exports.boostVehicle = async (req, res) => {
+  try {
+    await clearExpiredVehiclePromotions();
+
+    const { id } = req.params;
+    const { boostPlan } = req.body;
+    const userId = req.user.id;
+
+    if (!boostPlan || !BOOST_PLANS[boostPlan]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid boost plan. Choose 1day, 3day, or 7day.',
+      });
+    }
+
+    const vehicle = await Vehicle.findById(id);
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vehicle not found',
+      });
+    }
+
+    if (String(vehicle.owner) !== String(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to boost this vehicle.',
+      });
+    }
+
+    if (vehicle.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only active listings can be boosted.',
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.',
+      });
+    }
+
+    if (!user.boost?.number || user.boost.number <= 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'No boosts remaining on your current pack. Purchase a new pack or start a trial to boost this listing.',
+      });
+    }
+
+    const plan = BOOST_PLANS[boostPlan];
+    const now = new Date();
+    const expiryDate = new Date(now.getTime() + plan.duration * 24 * 60 * 60 * 1000);
+
+    user.boost.number -= 1;
+    user.boost.status = user.boost.number > 0;
+    await user.save();
+
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          isPromoted: true,
+          promotionExpiry: expiryDate,
+          boostPlan,
+        },
+      },
+      { new: true, runValidators: true },
+    ).populate('owner', 'name email phone');
+
+    res.status(200).json({
+      success: true,
+      message: `Listing boosted successfully with ${plan.label}!`,
+      data: {
+        vehicle: formatVehicleResponse(updatedVehicle, userId),
+        boost: {
+          plan: boostPlan,
+          label: plan.label,
+          expiryDate,
+          cost: plan.cost,
+        },
+        user: {
+          _id: user._id,
+          pack: user.pack,
+          boost: user.boost,
+          listingConfig: user.listingConfig,
+          trial: user.trial,
+        },
+      },
     });
   } catch (error) {
     handleError(res, error);
@@ -462,29 +787,44 @@ exports.searchVehicles = async (req, res) => {
 // Get user's vehicles
 exports.getUserVehicles = async (req, res) => {
   try {
+    await clearExpiredVehiclePromotions();
+
+    console.log('🚗 getUserVehicles called for user:', req.user.id);
     const { page = 1, limit = 10, status } = req.query;
-    
+
     const query = { owner: req.user.id };
     if (status) {
       query.status = status;
     }
 
+    console.log('🔍 Query:', JSON.stringify(query));
+
     const vehicles = await Vehicle.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
+      .sort({ isPromoted: -1, promotionExpiry: -1, createdAt: -1 })
+      .skip((Number(page) - 1) * Number(limit))
+      .limit(Number(limit))
       .populate('owner', 'name email phone');
 
     const total = await Vehicle.countDocuments(query);
 
-    res.status(200).json({
+    console.log(`✅ Found ${vehicles.length} vehicles (total: ${total})`);
+    
+    const formattedVehicles = vehicles.map(v => formatVehicleResponse(v, req.user?.id));
+    console.log('📦 Formatted vehicles:', JSON.stringify(formattedVehicles, null, 2));
+
+    const responseData = {
       success: true,
       count: vehicles.length,
       total,
-      pages: Math.ceil(total / limit),
-      data: vehicles
-    });
+      pages: Math.ceil(total / Number(limit)),
+      data: formattedVehicles
+    };
+
+    console.log('📤 Sending response:', JSON.stringify(responseData, null, 2));
+
+    res.status(200).json(responseData);
   } catch (error) {
+    console.error('❌ Error in getUserVehicles:', error);
     handleError(res, error);
   }
 };
@@ -496,7 +836,7 @@ exports.updateAvailability = async (req, res) => {
     if (availableFrom && availableTo && new Date(availableFrom) >= new Date(availableTo)) {
       return res.status(400).json({
         success: false,
-        message: "Available from date must be before available to date"
+        message: req.t('invalidDateRange')
       });
     }
 
@@ -517,7 +857,7 @@ exports.updateAvailability = async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: req.t('vehicleNotFound')
       });
     }
 
@@ -529,14 +869,5 @@ exports.updateAvailability = async (req, res) => {
     handleError(res, error);
   }
 };
-
-
-
-
-
-
-
-
-
 
 

@@ -1,16 +1,16 @@
 // controllers/reviewController.js
-const Review = require('../models/Review');
-const User = require('../models/User');
-const Booking = require('../models/Booking');
+const Review = require('../models/reviewModel');
+const User = require('../models/userModel');
+const Booking = require('../models/bookingModel');
 const mongoose = require('mongoose');
 
 // Dynamic model loading based on listingType
 const getListingModel = (listingType) => {
   switch (listingType) {
     case 'Property':
-      return require('../models/Property');
+      return require('../models/propertyModel');
     case 'Vehicle':
-      return require('../models/Vehicle');
+      return require('../models/vehicleModel');
     default:
       throw new Error(`Unknown listing type: ${listingType}`);
   }

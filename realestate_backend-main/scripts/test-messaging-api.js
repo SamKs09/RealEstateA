@@ -7,7 +7,7 @@
 require("dotenv").config();
 const axios = require("axios");
 
-const API_URL = "http://192.168.100.4:3000/api";
+const API_URL = "http://172.20.10.6:3000/api";
 
 // Support user credentials
 const SUPPORT_EMAIL = "support@gmail.com";

@@ -1,5 +1,6 @@
 import { apiService, ApiResponse } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // Auth Types
 export interface LoginRequest {
@@ -46,19 +47,35 @@ export interface ForgotPasswordPhoneRequest {
 }
 
 export interface ResetPasswordEmailRequest {
-  token: string;
-  password: string;
+  email: string;
+  otp: string;
+  newPassword: string;
   confirmPassword: string;
 }
 
 export interface ResetPasswordPhoneRequest {
   phoneNumber: string;
-  otp: string;
-  password: string;
+  code: string;
+  newPassword: string;
   confirmPassword: string;
 }
 
 export interface User {
+  pack: string;
+  listingConfig?: {
+    status: boolean;
+    number: number;
+  };
+  boost?: {
+    status: boolean;
+    number: number;
+  };
+  trial: {
+    isUsed?: boolean;
+    startDate?: string;
+    endDate?: string;
+    status?: 'none' | 'active' | 'expired';
+  } | null;
   _id: string;
   email?: string;
   phoneNumber?: string;
@@ -69,6 +86,8 @@ export interface User {
   interest?: 'property' | 'cars';
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
+  avatar?: string;
+  profileImage?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -88,7 +107,9 @@ class AuthService {
   // Store authentication data
   private async storeAuthData(token: string, user: User): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      // Store sensitive token in SecureStore
+      await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, token);
+      // Store non-sensitive user data in AsyncStorage
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
       apiService.setAuthToken(token);
     } catch (error) {
@@ -100,10 +121,23 @@ class AuthService {
   // Get stored token
   async getStoredToken(): Promise<string | null> {
     try {
+      // Try SecureStore first
+      const token = await SecureStore.getItemAsync(STORAGE_KEYS.TOKEN);
+      if (token) {
+        return token;
+      }
+      
+      // Fallback to AsyncStorage for compatibility
       return await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
     } catch (error) {
       console.error('Error getting stored token:', error);
-      return null;
+      // Final fallback to AsyncStorage
+      try {
+        return await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+      } catch (fallbackError) {
+        console.error('Fallback token retrieval also failed:', fallbackError);
+        return null;
+      }
     }
   }
 
@@ -136,7 +170,8 @@ class AuthService {
   // Clear authentication data
   async clearAuthData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([STORAGE_KEYS.TOKEN, STORAGE_KEYS.USER]);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER);
       apiService.removeAuthToken();
     } catch (error) {
       console.error('Error clearing auth data:', error);
@@ -148,11 +183,11 @@ class AuthService {
   async registerEmail(data: RegisterEmailRequest): Promise<ApiResponse<AuthResponse>> {
     try {
       const response = await apiService.post<AuthResponse>('/auth/register-email', data);
-      
+
       if (response.success && response.data) {
         await this.storeAuthData(response.data.token, response.data.user);
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -168,15 +203,23 @@ class AuthService {
     }
   }
 
+  async registerSellerPhoneWithKyc(data: FormData): Promise<ApiResponse<any>> {
+    try {
+      return await apiService.post('/auth/register-phone-seller-kyc', data);
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Verify OTP for phone registration
   async verifyOTP(data: VerifyOTPRequest): Promise<ApiResponse<AuthResponse>> {
     try {
       const response = await apiService.post<AuthResponse>('/auth/verify-otp', data);
-      
+
       if (response.success && response.data) {
         await this.storeAuthData(response.data.token, response.data.user);
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -196,10 +239,10 @@ class AuthService {
   async login(data: LoginRequest): Promise<ApiResponse<AuthResponse>> {
     try {
       console.log('🔄 AuthService: Sending login request to API...', { email: data.email });
-      
+
       const response = await apiService.post<AuthResponse>('/auth/login', data);
       console.log('📡 AuthService: Got response from API:', response);
-      
+
       if (response.success) {
         if (response.data && response.data.token) {
           // Standard format: { success: true, data: { user, token } }
@@ -209,23 +252,23 @@ class AuthService {
         } else if (response.access_token) {
           // Your backend format: { success: true, access_token: "..." }
           console.log('✅ AuthService: Login successful (backend format), storing access token...');
-          
-          // IMPORTANT: Set token in API service first, then store to AsyncStorage
+
+          // IMPORTANT: Set token in API service first, then store to SecureStore
           apiService.setAuthToken(response.access_token);
-          await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.access_token);
-          
+          await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, response.access_token);
+
           // Store user data if available
           const backendResponse = response as any;
           if (backendResponse.user) {
             await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(backendResponse.user));
           }
-          
+
           console.log('✅ AuthService: Access token stored and set in API headers successfully');
         }
       } else {
         console.error('❌ AuthService: Login failed - invalid response:', response);
       }
-      
+
       return response;
     } catch (error) {
       console.error('❌ AuthService: Login error:', error);
@@ -237,11 +280,11 @@ class AuthService {
   async loginPhone(data: LoginPhoneRequest): Promise<ApiResponse<AuthResponse>> {
     try {
       const response = await apiService.post<AuthResponse>('/auth/login-phone', data);
-      
+
       if (response.success && response.data) {
         await this.storeAuthData(response.data.token, response.data.user);
       }
-      
+
       return response;
     } catch (error) {
       throw error;
@@ -295,12 +338,13 @@ class AuthService {
       // This ensures user can logout even with invalid/expired token
       await this.clearAuthData();
       console.log('Logout API failed, but local data cleared:', error);
-      
-      // Return success since local logout succeeded
+
+      // Return success since local logout succeeded 
       return {
         success: true,
         message: 'Logged out locally',
-      };
+        offers: null,
+      } ;
     }
   }
 

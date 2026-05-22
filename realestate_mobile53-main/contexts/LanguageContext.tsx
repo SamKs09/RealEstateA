@@ -1,146 +1,92 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { I18nManager } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Localization from "expo-localization";
-import {
-  supportedLanguages,
-  setLanguage,
-  isRTL as checkIsRTL,
-  t,
-} from "../services/i18n";
+/**
+ * LanguageContext
+ * 
+ * Provides language state management across the entire app.
+ * Triggers re-renders when language changes to update all translated content.
+ */
 
-const LANGUAGE_STORAGE_KEY = "user_language";
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { setLanguage as setI18nLanguage, getCurrentLanguage } from '../services/i18n';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const LANGUAGE_STORAGE_KEY = '@app_language';
 
 interface LanguageContextType {
   currentLanguage: string;
-  currentLanguageInfo: (typeof supportedLanguages)[0];
-  isRTL: boolean;
-  supportedLanguages: typeof supportedLanguages;
-  changeLanguage: (languageCode: string) => Promise<boolean>;
-  t: (key: string, options?: any) => string;
+  changeLanguage: (languageCode: string) => Promise<void>;
   isLoading: boolean;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(
-  undefined
-);
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 interface LanguageProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-export const LanguageProvider: React.FC<LanguageProviderProps> = ({
-  children,
-}) => {
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [isLoading, setIsLoading] = useState(true);
+export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
+  const [currentLanguage, setCurrentLanguage] = useState(getCurrentLanguage());
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Get current language info
-  const getCurrentLanguageInfo = () => {
-    return (
-      supportedLanguages.find((lang) => lang.code === currentLanguage) ||
-      supportedLanguages[0]
-    );
-  };
-
-  // Initialize language on app start
-  useEffect(() => {
-    const initializeLanguage = async () => {
-      try {
-        // Check for saved language preference
-        const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
-
-        let languageToUse = "en"; // default
-
-        if (
-          savedLanguage &&
-          supportedLanguages.find((lang) => lang.code === savedLanguage)
-        ) {
-          languageToUse = savedLanguage;
-        } else {
-          // Use device language if supported
-          const deviceLanguage =
-            Localization.getLocales()[0]?.languageCode || "en";
-          if (supportedLanguages.find((lang) => lang.code === deviceLanguage)) {
-            languageToUse = deviceLanguage;
-          }
-        }
-
-        // Set the language
-        setLanguage(languageToUse);
-        setCurrentLanguage(languageToUse);
-
-        // Handle RTL
-        const isRTLLang = checkIsRTL();
-        if (I18nManager.isRTL !== isRTLLang) {
-          I18nManager.allowRTL(isRTLLang);
-          I18nManager.forceRTL(isRTLLang);
-        }
-      } catch (error) {
-        console.error("Error initializing language:", error);
-      } finally {
-        setIsLoading(false);
+  /**
+   * Change the app language and persist to storage
+   */
+  const changeLanguage = useCallback(async (languageCode: string) => {
+    setIsLoading(true);
+    try {
+      // Update i18n locale
+      const success = setI18nLanguage(languageCode);
+      
+      if (success) {
+        // Update state to trigger re-render
+        setCurrentLanguage(languageCode);
+        
+        // Persist to AsyncStorage
+        await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+        
+        console.log('Language changed to:', languageCode);
       }
-    };
-
-    initializeLanguage();
+    } catch (error) {
+      console.error('Error changing language:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const handleChangeLanguage = async (
-    languageCode: string
-  ): Promise<boolean> => {
-    try {
-      if (!supportedLanguages.find((lang) => lang.code === languageCode)) {
-        return false;
-      }
-
-      // Update i18n
-      const success = setLanguage(languageCode);
-      if (success) {
-        setCurrentLanguage(languageCode);
-
-        // Save to storage
-        await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
-
-        // Handle RTL
-        const isRTLLang = checkIsRTL();
-        if (I18nManager.isRTL !== isRTLLang) {
-          I18nManager.allowRTL(isRTLLang);
-          I18nManager.forceRTL(isRTLLang);
-        }
-
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error changing language:", error);
-      return false;
-    }
-  };
-
-  const contextValue: LanguageContextType = {
+  const value: LanguageContextType = {
     currentLanguage,
-    currentLanguageInfo: getCurrentLanguageInfo(),
-    isRTL: checkIsRTL(),
-    supportedLanguages,
-    changeLanguage: handleChangeLanguage,
-    t,
+    changeLanguage,
     isLoading,
   };
 
   return (
-    <LanguageContext.Provider value={contextValue}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
 };
 
+/**
+ * Hook to access language context
+ */
 export const useLanguage = (): LanguageContextType => {
   const context = useContext(LanguageContext);
+  
   if (context === undefined) {
-    throw new Error("useLanguage must be used within a LanguageProvider");
+    throw new Error('useLanguage must be used within a LanguageProvider');
   }
+  
   return context;
 };
 
-export default LanguageContext;
+/**
+ * Load saved language from storage
+ */
+export const loadSavedLanguage = async (): Promise<string | null> => {
+  try {
+    const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return savedLanguage;
+  } catch (error) {
+    console.error('Error loading saved language:', error);
+    return null;
+  }
+};

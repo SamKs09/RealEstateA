@@ -1,54 +1,53 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { forwardRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Modal from "./Modal";
+import BottomSheet, { BottomSheetModalMethods } from "./BottomSheet";
 
 interface TimePickerModalProps {
-  visible: boolean;
   title: string;
   selectedTime: string;
   timeSlots: string[];
   onTimeSelect: (time: string) => void;
-  onClose: () => void;
 }
 
-const TimePickerModal: React.FC<TimePickerModalProps> = ({
-  visible,
-  title,
-  selectedTime,
-  timeSlots,
-  onTimeSelect,
-  onClose,
-}) => {
-  return (
-    <Modal visible={visible} title={title} onClose={onClose}>
-      <View style={styles.container}>
-        {timeSlots.map((time) => (
-          <TouchableOpacity
-            key={time}
-            style={[
-              styles.timeOption,
-              selectedTime === time && styles.selectedTimeOption,
-            ]}
-            onPress={() => onTimeSelect(time)}
-          >
-            <Text
-              style={[
-                styles.timeText,
-                selectedTime === time && styles.selectedTimeText,
-              ]}
-            >
-              {time}
-            </Text>
-            {selectedTime === time && (
-              <Ionicons name="checkmark" size={20} color="#FF8C42" />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </Modal>
-  );
-};
+export type TimePickerModalRef = BottomSheetModalMethods;
+
+const TimePickerModal = forwardRef<TimePickerModalRef, TimePickerModalProps>(
+  ({ title, selectedTime, timeSlots, onTimeSelect }, ref) => {
+    return (
+      <BottomSheet ref={ref} title={title} snapPoints={["60%"]}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.container}>
+            {timeSlots.map((time) => (
+              <TouchableOpacity
+                key={time}
+                style={[
+                  styles.timeOption,
+                  selectedTime === time && styles.selectedTimeOption,
+                ]}
+                onPress={() => onTimeSelect(time)}
+              >
+                <Text
+                  style={[
+                    styles.timeText,
+                    selectedTime === time && styles.selectedTimeText,
+                  ]}
+                >
+                  {time}
+                </Text>
+                {selectedTime === time && (
+                  <Ionicons name="checkmark" size={20} color="#FF8C42" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      </BottomSheet>
+    );
+  }
+);
+
+export default TimePickerModal;
 
 const styles = StyleSheet.create({
   container: {
@@ -75,13 +74,11 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 14,
     color: "#333333",
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
   },
   selectedTimeText: {
     color: "#FF8C42",
     fontWeight: "bold",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
   },
 });
-
-export default TimePickerModal;

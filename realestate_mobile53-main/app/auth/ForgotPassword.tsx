@@ -17,11 +17,13 @@ import {
   TabNavigation,
 } from "../../components/Ui";
 import { Colors } from "../../components/styles";
+import { useTranslation } from "../../hooks/useTranslation";
 
 type RecoveryMethod = "email" | "phone";
 
 export default function ForgotPassword() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>("email");
   const [formData, setFormData] = useState({
     email: "",
@@ -50,16 +52,16 @@ export default function ForgotPassword() {
     if (recoveryMethod === "email") {
       // Email validation
       if (!formData.email.trim()) {
-        newErrors.email = "Email address is required";
+        newErrors.email = t("authentication.emailRequired");
       } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = "Please enter a valid email address";
+        newErrors.email = t("authentication.emailInvalid");
       }
     } else {
       // Phone validation
       if (!formData.phoneNumber.trim()) {
-        newErrors.phoneNumber = "Phone number is required";
+        newErrors.phoneNumber = t("validation.phoneNumberRequired");
       } else if (formData.phoneNumber.length < 8) {
-        newErrors.phoneNumber = "Phone number must be at least 8 digits";
+        newErrors.phoneNumber = t("validation.phoneInvalid") || "Invalid phone number";
       }
     }
 
@@ -91,7 +93,7 @@ export default function ForgotPassword() {
       };
 
       router.push({
-        pathname: "../onboarding/OTPVerification",
+        pathname: "./OTPVerification",
         params: verificationData,
       });
     } catch (error) {
@@ -113,7 +115,7 @@ export default function ForgotPassword() {
     },
     {
       key: "phone",
-      title: "Phone",
+      title: t("authentication.phoneNumber"),
       onPress: () => setRecoveryMethod("phone"),
     },
   ];
@@ -143,9 +145,9 @@ export default function ForgotPassword() {
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Forget Password</Text>
+        <Text style={styles.title}>{t("authentication.forgetPasswordTitle")}</Text>
         <Text style={styles.subtitle}>
-          We will send you a verification code to recover your password
+          {t("authentication.forgetPasswordSubtitle")}
         </Text>
 
         {/* Recovery Method Selection */}
@@ -168,7 +170,7 @@ export default function ForgotPassword() {
             />
           ) : (
             <FloatingLabelInput
-              label="Phone Number"
+              label={t("authentication.phoneNumber")}
               value={formData.phoneNumber}
               onChangeText={(value) => updateFormData("phoneNumber", value)}
               placeholder="99 999 999"
@@ -181,7 +183,7 @@ export default function ForgotPassword() {
 
         {/* Send Verification Button */}
         <PrimaryButton
-          title={`Send ${recoveryMethod === "email" ? "Email" : "SMS"}`}
+          title={t("authentication.submit")}
           onPress={handleSendVerification}
           disabled={isLoading}
           style={styles.sendButton}

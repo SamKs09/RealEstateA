@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install @gorhom/bottom-sheet",
+			"type": "shell",
+			"command": "npm install @gorhom/bottom-sheet react-native-reanimated react-native-gesture-handler",
+			"group": "build"
+		}
+	]
+}

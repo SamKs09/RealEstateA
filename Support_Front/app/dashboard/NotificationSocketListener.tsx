@@ -20,7 +20,9 @@ export default function NotificationSocketListener() {
       });
     };
     socket.on("notification:new", handler);
-    return () => { socket.off("notification:new", handler); };
+    return () => {
+      socket.off("notification:new", handler);
+    };
   }, [socket, addNotification]);
 
   return null;

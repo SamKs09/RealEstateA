@@ -25,6 +25,7 @@ export { NumericKeypad } from './NumericKeypad';
 // Home Page Components Export
 export { SearchBar } from './SearchBar';
 export { FilterChip } from './FilterChip';
+export { FilterPanel } from './FilterPanel';
 export { PropertyCard } from './PropertyCard';
 export { BookingCard } from './BookingCard';
 
@@ -37,6 +38,9 @@ export { default as TimePickerModal } from './TimePickerModal';
 
 // Language Components Export
 export { LanguageSelector } from './LanguageSelector';
+
+// Bottom Sheet Component Export
+export { default as BottomSheet } from './BottomSheet';
 
 // Map Components Export
 export { MapPicker } from './MapPicker';

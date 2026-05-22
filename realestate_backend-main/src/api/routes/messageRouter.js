@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const messagingController = require("../controllers/messagingController");
-const auth = require("../middleware/auth");
+const { auth } = require("../middleware/auth");
 
 // Get all threads with filtering
 router.get("/threads", auth, messagingController.getThreads);

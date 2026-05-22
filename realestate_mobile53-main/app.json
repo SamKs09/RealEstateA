@@ -16,18 +16,22 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to help you find properties nearby and set property locations on the map.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to help you find properties nearby and set property locations on the map."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to help you find properties nearby and set property locations on the map.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "config": {
         "googleMapsApiKey": "AIzaSyAqSchAEdRlw3Rsk17pfI7H4NaWnmiROi4"
-      }
+      },
+      "bundleIdentifier": "com.renti.registerapp"
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "package": "com.yourcompany.registerapp",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -50,11 +54,18 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to help you find properties nearby and set property locations on the map."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5534bdc9-c347-422e-88b0-3f8cb160d165"
+      }
     }
   }
 }

@@ -6,17 +6,28 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/RealEs
 
 const connectDB = async () => {
   try {
-    mongoose.connect(MONGODB_URI, {
-      useCreateIndex: true,
-      useFindAndModify: false,
-      useUnifiedTopology: true,
+    await mongoose.connect(MONGODB_URI, {
       useNewUrlParser: true,
+      useUnifiedTopology: true,
+      useFindAndModify: false,
+    });
+
+    mongoose.connection.on('connected', () => {
+      logger.info("🟢 MONGO CONNECTED");
+    });
+
+    mongoose.connection.on('error', (err) => {
+      logger.error("❌ MongoDB connection error:", err);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      logger.warn("⚠️ MongoDB disconnected");
     });
 
     logger.info("🟢 MONGO CONNECTED");
+
   } catch (error) {
-    console.log("MONGO FAILED ⚠️");
-    console.log(error);
+    logger.error("❌ MONGO FAILED:", error);
     process.exit(1);
   }
 };

@@ -2,20 +2,11 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Typography } from "../../components/styles";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const HomePage = () => {
   const router = useRouter();
-  const [locale, setLocale] = React.useState(i18n.locale);
-
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-    return () => clearInterval(checkLocale);
-  }, [locale]);
+  const { t } = useTranslation();
 
   const handleSignIn = () => {
     router.push("/auth/SignIn");
@@ -23,10 +14,6 @@ const HomePage = () => {
 
   const handleSignUp = () => {
     router.push("/auth/SignUp");
-  };
-
-  const handleExplore = () => {
-    router.push("/(tabs)/Explore");
   };
 
   return (
@@ -61,15 +48,6 @@ const HomePage = () => {
         >
           <Text style={styles.ghostButtonText}>
             {t("authentication.signUp")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={handleExplore}
-        >
-          <Text style={styles.secondaryButtonText}>
-            {t("authentication.browseProperties")}
           </Text>
         </TouchableOpacity>
       </View>

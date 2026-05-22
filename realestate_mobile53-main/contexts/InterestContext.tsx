@@ -7,23 +7,29 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-type InterestType = "property" | "cars";
+export type InterestType = "property" | "cars" | "both";
 type UserRole = "buyer" | "seller";
+// When interest is "both", the user can toggle which view they're browsing
+export type ActiveView = "property" | "cars";
 
 interface InterestContextType {
   userInterest: InterestType;
   userRole: UserRole;
+  // The currently active view — for "both" users this is toggled on Explore
+  activeView: ActiveView;
+  setActiveView: (view: ActiveView) => void;
   setUserInterest: (interest: InterestType) => Promise<void>;
   setUserRole: (role: UserRole) => Promise<void>;
   setUserPreferences: (interest: InterestType, role: UserRole) => Promise<void>;
   clearPreferences: () => Promise<void>;
   refreshPreferences: () => Promise<void>;
   isLoading: boolean;
-  // Helper functions
+  // Helper flags
   isSeller: boolean;
   isBuyer: boolean;
   isPropertyMode: boolean;
   isCarsMode: boolean;
+  isBothMode: boolean;
 }
 
 const InterestContext = createContext<InterestContextType | undefined>(
@@ -36,29 +42,40 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
   const [userInterest, setUserInterestState] =
     useState<InterestType>("property");
   const [userRole, setUserRoleState] = useState<UserRole>("buyer");
+  const [activeView, setActiveViewState] = useState<ActiveView>("property");
   const [isLoading, setIsLoading] = useState(true);
 
   // Load interest and role from AsyncStorage on mount
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const [interest, role] = await Promise.all([
+        const [interest, role, view] = await Promise.all([
           AsyncStorage.getItem("userInterest"),
           AsyncStorage.getItem("userRole"),
+          AsyncStorage.getItem("activeView"),
         ]);
 
-        if (interest === "cars" || interest === "property") {
+        if (interest === "cars" || interest === "property" || interest === "both") {
           setUserInterestState(interest);
+          // Default activeView based on interest
+          if (interest === "cars") {
+            setActiveViewState("cars");
+          } else {
+            setActiveViewState("property");
+          }
+        }
+
+        // Restore saved activeView for "both" users
+        if (view === "property" || view === "cars") {
+          setActiveViewState(view);
         }
 
         if (role === "buyer" || role === "seller") {
           setUserRoleState(role);
         } else if (role === "landlord") {
-          // Migrate old "landlord" role to "seller"
           setUserRoleState("seller");
           await AsyncStorage.setItem("userRole", "seller");
         } else if (role === "renter") {
-          // Migrate old "renter" role to "buyer"
           setUserRoleState("buyer");
           await AsyncStorage.setItem("userRole", "buyer");
         }
@@ -71,11 +88,23 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
     loadPreferences();
   }, []);
 
+  // Toggle the active view (for "both" users on Explore)
+  const setActiveView = (view: ActiveView) => {
+    setActiveViewState(view);
+    AsyncStorage.setItem("activeView", view).catch(() => {});
+  };
+
   // Update interest and save to AsyncStorage
   const setUserInterest = async (interest: InterestType) => {
     try {
       await AsyncStorage.setItem("userInterest", interest);
       setUserInterestState(interest);
+      // Sync activeView with single-mode interests
+      if (interest === "cars") {
+        setActiveView("cars");
+      } else if (interest === "property") {
+        setActiveView("property");
+      }
     } catch (error) {
       console.error("Error saving user interest:", error);
     }
@@ -100,6 +129,11 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
       ]);
       setUserInterestState(interest);
       setUserRoleState(role);
+      if (interest === "cars") {
+        setActiveView("cars");
+      } else {
+        setActiveView("property");
+      }
     } catch (error) {
       console.error("Error saving user preferences:", error);
     }
@@ -109,12 +143,10 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
   const clearPreferences = async () => {
     try {
       console.log("🧹 Clearing user preferences and session data...");
-      await AsyncStorage.multiRemove(["userInterest", "userRole"]);
-
-      // Reset to default values
+      await AsyncStorage.multiRemove(["userInterest", "userRole", "activeView"]);
       setUserInterestState("property");
       setUserRoleState("buyer");
-
+      setActiveViewState("property");
       console.log("✅ Preferences cleared successfully");
     } catch (error) {
       console.error("Error clearing user preferences:", error);
@@ -125,14 +157,21 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
   const refreshPreferences = async () => {
     try {
       console.log("🔄 Refreshing user preferences from storage...");
-      const [interest, role] = await Promise.all([
+      const [interest, role, view] = await Promise.all([
         AsyncStorage.getItem("userInterest"),
         AsyncStorage.getItem("userRole"),
+        AsyncStorage.getItem("activeView"),
       ]);
 
-      if (interest === "cars" || interest === "property") {
+      if (interest === "cars" || interest === "property" || interest === "both") {
         setUserInterestState(interest);
         console.log(`✅ Interest refreshed: ${interest}`);
+        if (interest === "cars") setActiveViewState("cars");
+        else if (interest === "property") setActiveViewState("property");
+      }
+
+      if (view === "property" || view === "cars") {
+        setActiveViewState(view);
       }
 
       if (role === "buyer" || role === "seller") {
@@ -147,14 +186,17 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
   // Helper computed values
   const isSeller = userRole === "seller";
   const isBuyer = userRole === "buyer";
-  const isPropertyMode = userInterest === "property";
-  const isCarsMode = userInterest === "cars";
+  const isPropertyMode = activeView === "property";
+  const isCarsMode = activeView === "cars";
+  const isBothMode = userInterest === "both";
 
   return (
     <InterestContext.Provider
       value={{
         userInterest,
         userRole,
+        activeView,
+        setActiveView,
         setUserInterest,
         setUserRole,
         setUserPreferences,
@@ -165,6 +207,7 @@ export const InterestProvider: React.FC<{ children: ReactNode }> = ({
         isBuyer,
         isPropertyMode,
         isCarsMode,
+        isBothMode,
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const Conversation = require('../models/Conversation');
 const SupportMessage = require('../models/SupportMessageModel');
 
@@ -17,14 +17,14 @@ router.post('/conversation', auth, async (req, res) => {
   try {
     const userId = req.user._id;
     const { subject, category } = req.body;
-    
+
     // Check if user has an open conversation
     let conversation = await Conversation.findOne({
       'participants.userId': userId,
       'participants.role': 'user',
       status: { $in: ['open', 'active'] }
     }).populate('participants.userId', 'firstName lastName avatar');
-    
+
     if (!conversation) {
       // Create new conversation
       conversation = new Conversation({
@@ -36,11 +36,11 @@ router.post('/conversation', auth, async (req, res) => {
         category: category || 'general',
         status: 'open'
       });
-      
+
       await conversation.save();
       await conversation.populate('participants.userId', 'firstName lastName avatar');
     }
-    
+
     res.json({
       success: true,
       data: conversation
@@ -63,23 +63,23 @@ router.post('/conversation', auth, async (req, res) => {
 router.get('/my-conversation', auth, async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     const conversation = await Conversation.findOne({
       'participants.userId': userId,
       'participants.role': 'user'
     }).populate('participants.userId', 'firstName lastName avatar');
-    
+
     if (!conversation) {
       return res.json({
         success: true,
         data: null
       });
     }
-    
+
     const messages = await SupportMessage.find({ conversationId: conversation._id })
       .populate('senderId', 'firstName lastName avatar')
       .sort({ createdAt: 1 });
-    
+
     res.json({
       success: true,
       data: {
@@ -107,7 +107,7 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
     const { conversationId } = req.params;
     const { text, attachments } = req.body;
     const userId = req.user._id;
-    
+
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({
@@ -115,22 +115,22 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
         message: 'Conversation not found'
       });
     }
-    
+
     // Verify user is participant
     const userParticipant = conversation.participants.find(
       p => p.userId && p.userId.toString() === userId.toString() && p.role === 'user'
     );
-    
+
     if (!userParticipant) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
       });
     }
-    
+
     // Get support participant
     const supportParticipant = conversation.participants.find(p => p.role === 'support');
-    
+
     // Create message
     const message = new SupportMessage({
       conversationId,
@@ -141,10 +141,10 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
       status: 'sent',
       attachments: attachments || []
     });
-    
+
     await message.save();
     await message.populate('senderId', 'firstName lastName avatar');
-    
+
     // Update conversation
     conversation.status = 'active';
     conversation.lastMessage = {
@@ -153,14 +153,14 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
       timestamp: new Date(),
       isFromUser: true
     };
-    
+
     // Increment support unread count
     if (supportParticipant) {
       supportParticipant.unreadCount += 1;
     }
-    
+
     await conversation.save();
-    
+
     // Emit real-time event
     const io = req.app.get('io');
     if (io) {
@@ -169,13 +169,13 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
         conversationId,
         message
       });
-      
+
       // Emit to support dashboard
       io.to('support:dashboard').emit('conversation:updated', {
         conversationId,
         conversation
       });
-      
+
       // Notify support agent if assigned
       if (supportParticipant?.userId) {
         io.to(`user:${supportParticipant.userId}`).emit('message:received', {
@@ -189,7 +189,7 @@ router.post('/conversation/:conversationId/message', auth, async (req, res) => {
         });
       }
     }
-    
+
     res.status(201).json({
       success: true,
       data: message
@@ -213,7 +213,7 @@ router.put('/conversation/:conversationId/read', auth, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const userId = req.user._id;
-    
+
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({
@@ -221,18 +221,18 @@ router.put('/conversation/:conversationId/read', auth, async (req, res) => {
         message: 'Conversation not found'
       });
     }
-    
+
     const userParticipant = conversation.participants.find(
       p => p.userId && p.userId.toString() === userId.toString()
     );
-    
+
     if (!userParticipant) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized'
       });
     }
-    
+
     // Mark support messages as read
     await SupportMessage.updateMany(
       {
@@ -245,12 +245,12 @@ router.put('/conversation/:conversationId/read', auth, async (req, res) => {
         readAt: new Date()
       }
     );
-    
+
     // Reset unread count
     userParticipant.unreadCount = 0;
     userParticipant.lastReadAt = new Date();
     await conversation.save();
-    
+
     // Emit read receipt
     const io = req.app.get('io');
     if (io) {
@@ -260,7 +260,7 @@ router.put('/conversation/:conversationId/read', auth, async (req, res) => {
         timestamp: new Date()
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Messages marked as read'
@@ -287,20 +287,20 @@ router.put('/conversation/:conversationId/read', auth, async (req, res) => {
 router.get('/conversations', auth, async (req, res) => {
   try {
     const { status, priority, page = 1, limit = 50 } = req.query;
-    
+
     const query = {};
     if (status) query.status = status;
     if (priority) query.priority = priority;
-    
+
     const conversations = await Conversation.find(query)
       .populate('participants.userId', 'firstName lastName email avatar')
       .populate('assignedTo', 'firstName lastName')
       .sort({ updatedAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
-    
+
     const total = await Conversation.countDocuments(query);
-    
+
     res.json({
       success: true,
       data: {
@@ -331,34 +331,34 @@ router.get('/conversations', auth, async (req, res) => {
 router.get('/conversations/:conversationId', auth, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    
+
     const conversation = await Conversation.findById(conversationId)
       .populate('participants.userId', 'firstName lastName email avatar phoneNumber')
       .populate('assignedTo', 'firstName lastName email');
-    
+
     if (!conversation) {
       return res.status(404).json({
         success: false,
         message: 'Conversation not found'
       });
     }
-    
+
     const messages = await SupportMessage.find({ conversationId })
       .populate('senderId', 'firstName lastName avatar')
       .sort({ createdAt: 1 });
-    
+
     // Mark user messages as read
     const userParticipant = conversation.participants.find(p => p.role === 'user');
     if (userParticipant) {
       userParticipant.unreadCount = 0;
       await conversation.save();
     }
-    
+
     await SupportMessage.updateMany(
       { conversationId, isFromUser: true, status: { $ne: 'read' } },
       { status: 'read', readAt: new Date() }
     );
-    
+
     res.json({
       success: true,
       data: {
@@ -385,7 +385,7 @@ router.put('/conversations/:conversationId/assign', auth, async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { supportId } = req.body;
-    
+
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({
@@ -393,17 +393,17 @@ router.put('/conversations/:conversationId/assign', auth, async (req, res) => {
         message: 'Conversation not found'
       });
     }
-    
+
     conversation.assignedTo = supportId;
-    
+
     // Update support participant
     const supportParticipant = conversation.participants.find(p => p.role === 'support');
     if (supportParticipant) {
       supportParticipant.userId = supportId;
     }
-    
+
     await conversation.save();
-    
+
     res.json({
       success: true,
       message: 'Conversation assigned successfully'
@@ -426,7 +426,7 @@ router.put('/conversations/:conversationId/assign', auth, async (req, res) => {
 router.put('/conversations/:conversationId/close', auth, async (req, res) => {
   try {
     const { conversationId } = req.params;
-    
+
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({
@@ -434,11 +434,11 @@ router.put('/conversations/:conversationId/close', auth, async (req, res) => {
         message: 'Conversation not found'
       });
     }
-    
+
     conversation.status = 'closed';
     conversation.closedAt = new Date();
     await conversation.save();
-    
+
     // Emit event
     const io = req.app.get('io');
     if (io) {
@@ -446,7 +446,7 @@ router.put('/conversations/:conversationId/close', auth, async (req, res) => {
         conversationId
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Conversation closed'

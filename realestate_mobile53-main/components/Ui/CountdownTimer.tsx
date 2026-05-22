@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
     fontFamily: "raleway-500Medium",
   },
   numberText: {
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
 });

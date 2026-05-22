@@ -45,6 +45,7 @@ export interface PropertyAvailability {
 
 export interface PropertyMedia {
   images?: string[];
+  videos?: string[];
 }
 
 export interface Property {
@@ -59,7 +60,7 @@ export interface Property {
   };
   title: string;
   description: string;
-  type: 'apartment' | 'house' | 'commercial' | 'land' | 'office';
+  type: 'apartment' | 'house' | 'villa' | 'hotel' | 'commercial' | 'land' | 'office';
   listingType: 'sale' | 'rent';
   propertyDetails?: PropertyDetails;
   location: PropertyLocation;
@@ -73,6 +74,7 @@ export interface Property {
   likes?: number;
   isPromoted?: boolean;
   promotionExpiry?: string;
+  isLocked?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -80,7 +82,7 @@ export interface Property {
 export interface CreatePropertyData {
   title: string;
   description: string;
-  type: 'apartment' | 'house' | 'commercial' | 'land' | 'office';
+  type: 'apartment' | 'house' | 'villa' | 'hotel' | 'commercial' | 'land' | 'office';
   listingType: 'sale' | 'rent';
   propertyDetails?: PropertyDetails;
   location: PropertyLocation;
@@ -139,6 +141,11 @@ export const getMyListings = async (): Promise<Property[]> => {
   return (response as any).listings || [];
 };
 
+export const getPublicUserProperties = async (userId: string): Promise<Property[]> => {
+  const response = await api.get<{ properties: Property[] }>(`/properties/user/${userId}`);
+  return response.data?.properties || [];
+};
+
 export const searchProperties = async (params: SearchPropertyParams): Promise<{
   properties: Property[];
   pagination: {
@@ -154,7 +161,7 @@ export const searchProperties = async (params: SearchPropertyParams): Promise<{
       .filter(([_, value]) => value !== undefined && value !== null)
       .map(([key, value]) => [key, String(value)])
   ).toString();
-  
+
   const endpoint = queryString ? `/properties/search?${queryString}` : '/properties/search';
   const response = await api.get<{
     properties: Property[];
@@ -250,6 +257,7 @@ export const createPropertyFormData = (
   propertyData: CreatePropertyData,
   mediaFiles?: {
     images?: { uri: string; type: string; name: string }[];
+    videos?: { uri: string; type: string; name: string }[];
   }
 ): FormData => {
   const formData = new FormData();
@@ -295,6 +303,17 @@ export const createPropertyFormData = (
     });
   }
 
+  // Add video files
+  if (mediaFiles?.videos) {
+    mediaFiles.videos.forEach((video) => {
+      formData.append('videos', {
+        uri: video.uri,
+        type: video.type,
+        name: video.name,
+      } as any);
+    });
+  }
+
   return formData;
 };
 
@@ -303,13 +322,38 @@ export const createPropertyWithMedia = async (
   propertyData: CreatePropertyData,
   mediaFiles?: {
     images?: { uri: string; type: string; name: string }[];
+    videos?: { uri: string; type: string; name: string }[];
   }
 ): Promise<Property> => {
   const formData = createPropertyFormData(propertyData, mediaFiles);
-  
+
   const response = await api.post<Property>('/properties', formData);
-  
+
   return response.data as Property;
+};
+
+export const boostProperty = async (
+  propertyId: string,
+  boostPlan: '1day' | '3day' | '7day'
+): Promise<{ property: Property; boost: { plan: string; label: string; expiryDate: string; cost: number }; user?: any }> => {
+  const response = await api.post<any>(`/properties/${propertyId}/boost`, { boostPlan });
+  return response.data;
+};
+
+export const initiatePropertyBoostPayment = async (
+  propertyId: string,
+  boostPlan: '1day' | '3day' | '7day'
+): Promise<{
+  transactionId: string;
+  kind: 'property_boost';
+  status: string;
+  amount: number;
+  currency: string;
+  boostPlan: string;
+  checkoutUrl?: string | null;
+}> => {
+  const response = await api.post<any>(`/payments/properties/${propertyId}/initiate-boost`, { boostPlan });
+  return response.data as any;
 };
 
 export default {
@@ -329,4 +373,6 @@ export default {
   updateAvailability,
   createPropertyFormData,
   createPropertyWithMedia,
+  boostProperty,
+  initiatePropertyBoostPayment,
 };

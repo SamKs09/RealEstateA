@@ -2,58 +2,23 @@ import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenLayout, SelectionButton } from "../../components/Ui";
-import i18n, { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 
-type InterestOption = "cars" | "property" | null;
+type InterestOption = "cars" | "property" | "both" | null;
 type UserType = "buyer" | "seller";
 
 const ChooseInterestScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
   const { userType } = useLocalSearchParams<{ userType: UserType }>();
   const [selectedOption, setSelectedOption] = useState<InterestOption>(null);
-  const [locale, setLocale] = useState(i18n.locale);
 
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-    return () => clearInterval(checkLocale);
-  }, [locale]);
-
-  const handleCarsSelection = () => {
-    console.log("Cars selected for", userType);
-    setSelectedOption("cars");
-    // Navigate to appropriate signup form based on user type
-    if (userType === "seller") {
-      router.push({
-        pathname: "/auth/SellerSignUp",
-        params: { interest: "cars" },
-      });
-    } else {
-      router.push({
-        pathname: "/auth/BuyerSignUp",
-        params: { interest: "cars" },
-      });
-    }
-  };
-
-  const handlePropertySelection = () => {
-    console.log("Property selected for", userType);
-    setSelectedOption("property");
-    // Navigate to appropriate signup form based on user type
-    if (userType === "seller") {
-      router.push({
-        pathname: "/auth/SellerSignUp",
-        params: { interest: "property" },
-      });
-    } else {
-      router.push({
-        pathname: "/auth/BuyerSignUp",
-        params: { interest: "property" },
-      });
-    }
+  const navigate = (interest: InterestOption) => {
+    if (!interest) return;
+    setSelectedOption(interest);
+    const pathname =
+      userType === "seller" ? "/auth/SellerSignUp" : "/auth/BuyerSignUp";
+    router.push({ pathname, params: { interest } });
   };
 
   return (
@@ -66,16 +31,25 @@ const ChooseInterestScreen = () => {
     >
       <View style={styles.buttonContainer}>
         <SelectionButton
-          title={t("authentication.cars")}
-          onPress={handleCarsSelection}
-          variant={selectedOption === "cars" ? "primary" : "secondary"}
+          title={t("authentication.property")}
+          onPress={() => navigate("property")}
+          variant={selectedOption === "property" ? "primary" : "secondary"}
+          accessibilityLabel="Select Property Interest"
         />
 
         <SelectionButton
-          title={t("authentication.property")}
-          onPress={handlePropertySelection}
-          variant={selectedOption === "property" ? "primary" : "secondary"}
+          title={t("authentication.cars")}
+          onPress={() => navigate("cars")}
+          variant={selectedOption === "cars" ? "primary" : "secondary"}
+          accessibilityLabel="Select Cars Interest"
+        />
+
+        <SelectionButton
+          title={t("authentication.both")}
+          onPress={() => navigate("both")}
+          variant={selectedOption === "both" ? "primary" : "secondary"}
           style={styles.lastButton}
+          accessibilityLabel="Select Both Interest"
         />
       </View>
     </ScreenLayout>

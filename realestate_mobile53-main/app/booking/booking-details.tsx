@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,19 +7,32 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   CalendarPicker,
   TimeSelector,
   ToggleSwitch,
   TimePickerModal,
 } from "../../components/Ui";
-import { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
 import { useInterest } from "../../contexts/InterestContext";
 
 export default function BookingDetailsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const params = useLocalSearchParams();
   const { userInterest } = useInterest();
+
+  const {
+    listingId,
+    analyticsListingType,
+    propertyName,
+    location,
+    pricePerNight,
+    propertyImage,
+    bedrooms,
+    bathrooms,
+  } = params;
 
   const [selectedStartDate, setSelectedStartDate] = useState(0);
   const [selectedEndDate, setSelectedEndDate] = useState(0);
@@ -27,8 +40,8 @@ export default function BookingDetailsScreen() {
   const [currentYear, setCurrentYear] = useState(2025);
   const [arrivingTime, setArrivingTime] = useState("09:00 AM");
   const [leavingTime, setLeavingTime] = useState("05:00 PM");
-  const [showArrivingModal, setShowArrivingModal] = useState(false);
-  const [showLeavingModal, setShowLeavingModal] = useState(false);
+  const arrivingModalRef = useRef<any>(null);
+  const leavingModalRef = useRef<any>(null);
   const [driverEnabled, setDriverEnabled] = useState(true);
 
   const months = [
@@ -107,12 +120,12 @@ export default function BookingDetailsScreen() {
 
   const handleArrivingTimeSelect = (time: string) => {
     setArrivingTime(time);
-    setShowArrivingModal(false);
+    arrivingModalRef.current?.dismiss();
   };
 
   const handleLeavingTimeSelect = (time: string) => {
     setLeavingTime(time);
-    setShowLeavingModal(false);
+    leavingModalRef.current?.dismiss();
   };
 
   const handleConfirmBooking = () => {
@@ -141,14 +154,19 @@ export default function BookingDetailsScreen() {
     router.push({
       pathname: "/payment" as any,
       params: {
+        listingId: (listingId as string) || "",
+        analyticsListingType: (analyticsListingType as string) || "",
         checkInDate,
         checkOutDate,
         arrivingTime,
         leavingTime,
         driverEnabled: driverEnabled.toString(),
-        propertyName: t("bookings.sampleProperty1"),
-        location: t("bookings.sampleLocation"),
-        pricePerNight: "180",
+        propertyName: (propertyName as string) || t("bookings.sampleProperty1"),
+        location: (location as string) || t("bookings.sampleLocation"),
+        pricePerNight: (pricePerNight as string) || "180",
+        propertyImage: (propertyImage as string) || "",
+        bedrooms: (bedrooms as string) || "0",
+        bathrooms: (bathrooms as string) || "0",
       },
     });
   };
@@ -163,7 +181,7 @@ export default function BookingDetailsScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t("bookings.bookingDetails")}</Text>
+        <Text style={styles.headerTitle}>{t("bookings.confirmBooking")}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -214,7 +232,7 @@ export default function BookingDetailsScreen() {
                 <View style={styles.dateItem}>
                   <Text style={styles.dateLabel}>
                     {userInterest === "cars"
-                      ? "Pickup Date"
+                      ? t("bookings.pickupDate")
                       : t("bookings.checkIn")}
                   </Text>
                   <View style={styles.dateValueContainer}>
@@ -230,7 +248,7 @@ export default function BookingDetailsScreen() {
                   <View style={styles.dateItem}>
                     <Text style={styles.dateLabel}>
                       {userInterest === "cars"
-                        ? "Return Date"
+                        ? t("bookings.returnDate")
                         : t("bookings.checkOut")}
                     </Text>
                     <View style={styles.dateValueContainer}>
@@ -243,12 +261,12 @@ export default function BookingDetailsScreen() {
                     </View>
                   </View>
                 )}
-                {!selectedEndDate && (
-                  <Text style={styles.singleDayNote}>
-                    {t("bookings.singleDayBooking")}
-                  </Text>
-                )}
               </View>
+              {!selectedEndDate && (
+                <Text style={styles.singleDayNote}>
+                  {t("bookings.singleDayBooking")}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -259,21 +277,21 @@ export default function BookingDetailsScreen() {
             <TimeSelector
               label={
                 userInterest === "cars"
-                  ? "Pickup Time"
+                  ? t("bookings.pickupTime")
                   : t("bookings.arrivingTime")
               }
               selectedTime={arrivingTime}
-              onPress={() => setShowArrivingModal(true)}
+              onPress={() => arrivingModalRef.current?.present()}
             />
 
             <TimeSelector
               label={
                 userInterest === "cars"
-                  ? "Return Time"
+                  ? t("bookings.returnTime")
                   : t("bookings.leavingTime")
               }
               selectedTime={leavingTime}
-              onPress={() => setShowLeavingModal(true)}
+              onPress={() => leavingModalRef.current?.present()}
             />
           </View>
         </View>
@@ -293,31 +311,29 @@ export default function BookingDetailsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Time Picker Modals */}
+      {/* Time Picker Bottom Sheets */}
       <TimePickerModal
-        visible={showArrivingModal}
+        ref={arrivingModalRef}
         title={
           userInterest === "cars"
-            ? "Select Pickup Time"
+            ? t("bookings.selectPickupTime")
             : t("bookings.selectArrivingTime")
         }
         selectedTime={arrivingTime}
         timeSlots={timeSlots}
         onTimeSelect={handleArrivingTimeSelect}
-        onClose={() => setShowArrivingModal(false)}
       />
 
       <TimePickerModal
-        visible={showLeavingModal}
+        ref={leavingModalRef}
         title={
           userInterest === "cars"
-            ? "Select Return Time"
+            ? t("bookings.selectReturnTime")
             : t("bookings.selectLeavingTime")
         }
         selectedTime={leavingTime}
         timeSlots={timeSlots}
         onTimeSelect={handleLeavingTimeSelect}
-        onClose={() => setShowLeavingModal(false)}
       />
     </View>
   );
@@ -449,6 +465,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
   },
   selectedDatesTitle: {
+    textAlign: "center",
     fontSize: 16,
     fontWeight: "bold",
     fontFamily: "raleway-500Medium",
@@ -480,7 +497,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333333",
     fontWeight: "bold",
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
   },
   monthText: {
     fontSize: 16,

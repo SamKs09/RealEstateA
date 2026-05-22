@@ -1,8 +1,25 @@
 import { apiService, ApiResponse } from './api';
+import type { Property } from './propertyService';
+import type { Vehicle } from './vehicleService';
 
 // User Types
 export interface UserProfile {
   _id: string;
+  pack?: 'freemium' | 'bronze' | 'silver' | 'gold' | 'platinum';
+  listingConfig?: {
+    status: boolean;
+    number: number;
+  };
+  boost?: {
+    status: boolean;
+    number: number;
+  };
+  trial?: {
+    isUsed?: boolean;
+    startDate?: string;
+    endDate?: string;
+    status?: 'none' | 'active' | 'expired';
+  } | null;
   email?: string;
   phoneNumber?: string;
   firstName?: string;
@@ -11,7 +28,6 @@ export interface UserProfile {
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   profileImage?: string;
-  bio?: string;
   location?: {
     address?: string;
     city?: string;
@@ -42,7 +58,6 @@ export interface UserProfile {
 export interface UpdateUserProfileRequest {
   firstName?: string;
   lastName?: string;
-  bio?: string;
   location?: {
     address?: string;
     city?: string;
@@ -84,29 +99,90 @@ export interface UpdatePhoneRequest {
   password: string;
 }
 
+export type PackType = 'freemium' | 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface PurchasePackResponse {
+  user: UserProfile;
+  benefits: {
+    listings: number;
+    boosts: number;
+  };
+}
+
+export interface PaymentTransactionSummary {
+  transactionId: string;
+  kind: 'pack_purchase' | 'property_boost' | 'vehicle_boost';
+  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired';
+  amount: number;
+  currency: string;
+  description?: string;
+  pack?: Exclude<PackType, 'freemium'> | null;
+  boostPlan?: '1day' | '3day' | '7day' | null;
+  checkoutUrl?: string | null;
+  flouciPaymentId?: string | null;
+  processedAt?: string | null;
+  paidAt?: string | null;
+  createdAt?: string | null;
+  user?: UserProfile;
+  property?: {
+    _id?: string;
+    title?: string;
+    isPromoted?: boolean;
+    promotionExpiry?: string;
+    boostPlan?: string;
+    status?: string;
+  };
+  vehicle?: {
+    _id?: string;
+    title?: string;
+    isPromoted?: boolean;
+    promotionExpiry?: string;
+    boostPlan?: string;
+    status?: string;
+  };
+}
+
+export type FavoriteListingType = 'property' | 'vehicle';
+export type FavoriteListing = Property | Vehicle;
+
 class UserService {
   // Get current user profile
   async getUserProfile(): Promise<ApiResponse<UserProfile>> {
     try {
-      return await apiService.get<UserProfile>('/user/profile');
+      const response = await apiService.get<UserProfile>('/user/profile');
+      // If the backend returns 'user' instead of 'data', normalize it
+      if (response.success && !response.data && (response as any).user) {
+        response.data = (response as any).user;
+      }
+      return response;
     } catch (error) {
       throw error;
     }
   }
 
-  // Get user by ID
+  // Get user by ID (Public profile)
   async getUserById(userId: string): Promise<ApiResponse<UserProfile>> {
     try {
-      return await apiService.get<UserProfile>(`/user/${userId}`);
+      const response = await apiService.get<UserProfile>(`/user/profile/${userId}`);
+      // If the backend returns 'user' instead of 'data', normalize it
+      if (response.success && !response.data && (response as any).user) {
+        response.data = (response as any).user;
+      }
+      return response;
     } catch (error) {
       throw error;
     }
   }
 
   // Update user profile
-  async updateProfile(updates: UpdateUserProfileRequest): Promise<ApiResponse<UserProfile>> {
+  async updateProfile(updates: UpdateUserProfileRequest | FormData): Promise<ApiResponse<UserProfile>> {
     try {
-      return await apiService.put<UserProfile>('/user/profile', updates);
+      const response = await apiService.put<UserProfile>('/user/profile', updates);
+      // If the backend returns 'user' instead of 'data', normalize it
+      if (response.success && !response.data && (response as any).user) {
+        response.data = (response as any).user;
+      }
+      return response;
     } catch (error) {
       throw error;
     }
@@ -115,25 +191,7 @@ class UserService {
   // Upload profile image
   async uploadProfileImage(imageFile: FormData): Promise<ApiResponse<{ profileImage: string }>> {
     try {
-      const response = await fetch(`${apiService['baseURL']}/user/profile/image`, {
-        method: 'POST',
-        headers: {
-          'Authorization': apiService['defaultHeaders']['Authorization'] || '',
-        },
-        body: imageFile,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw {
-          success: false,
-          message: result.message || 'Failed to upload profile image',
-          status: response.status,
-        };
-      }
-
-      return result;
+      return await apiService.post<{ profileImage: string }>('/user/profile/image', imageFile);
     } catch (error) {
       throw error;
     }
@@ -235,10 +293,10 @@ class UserService {
       const queryParams = new URLSearchParams();
       if (page) queryParams.append('page', page.toString());
       if (limit) queryParams.append('limit', limit.toString());
-      
+
       const queryString = queryParams.toString();
       const endpoint = queryString ? `/user/activity?${queryString}` : '/user/activity';
-      
+
       return await apiService.get(endpoint);
     } catch (error) {
       throw error;
@@ -295,6 +353,122 @@ class UserService {
         reason,
         details,
       });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get user's own offers/bookings (Buyer action)
+  async getMyOffers(): Promise<ApiResponse<any[]>> {
+    try {
+      return await apiService.get<any[]>('/seller/my-offers');
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getFavoriteListingIds(listingType: FavoriteListingType): Promise<string[]> {
+    try {
+      const endpoint = listingType === 'property'
+        ? '/user/favorites/properties?limit=1000'
+        : '/user/favorites/vehicles?limit=1000';
+      const response = await apiService.get(endpoint);
+      const rawResponse = response as any;
+      const favorites = rawResponse.favorites || rawResponse.data?.favorites || [];
+
+      return favorites
+        .map((favorite: any) => {
+          if (typeof favorite === 'string') {
+            return favorite;
+          }
+          return favorite?._id || favorite?.id || null;
+        })
+        .filter(Boolean);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getFavoriteListings(listingType: FavoriteListingType): Promise<FavoriteListing[]> {
+    try {
+      const endpoint = listingType === 'property'
+        ? '/user/favorites/properties?limit=1000'
+        : '/user/favorites/vehicles?limit=1000';
+      const response = await apiService.get(endpoint);
+      const rawResponse = response as any;
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to load favorites');
+      }
+
+      return (rawResponse.favorites || rawResponse.data?.favorites || []) as FavoriteListing[];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async addFavoriteListing(listingId: string, listingType: FavoriteListingType): Promise<void> {
+    try {
+      const endpoint = listingType === 'property'
+        ? `/user/favorites/properties/${listingId}`
+        : `/user/favorites/vehicles/${listingId}`;
+      const response = await apiService.post(endpoint);
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to add favorite');
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async removeFavoriteListing(listingId: string, listingType: FavoriteListingType): Promise<void> {
+    try {
+      const endpoint = listingType === 'property'
+        ? `/user/favorites/properties/${listingId}`
+        : `/user/favorites/vehicles/${listingId}`;
+      const response = await apiService.delete(endpoint);
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to remove favorite');
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async purchasePack(pack: PackType): Promise<ApiResponse<PurchasePackResponse>> {
+    try {
+      const response = await apiService.post<PurchasePackResponse>('/user/purchase-pack', { pack });
+      if (response.success && !response.data && (response as any).user) {
+        response.data = {
+          user: (response as any).user,
+          benefits: (response as any).benefits,
+        };
+      }
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async initiatePackPayment(pack: Exclude<PackType, 'freemium'>): Promise<ApiResponse<PaymentTransactionSummary>> {
+    try {
+      return await apiService.post<PaymentTransactionSummary>('/payments/initiate-pack', { pack });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getPaymentTransaction(transactionId: string): Promise<ApiResponse<PaymentTransactionSummary>> {
+    try {
+      return await apiService.get<PaymentTransactionSummary>(`/payments/transactions/${transactionId}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getPaymentHistory(): Promise<ApiResponse<PaymentTransactionSummary[]>> {
+    try {
+      return await apiService.get<PaymentTransactionSummary[]>('/payments/transactions');
     } catch (error) {
       throw error;
     }

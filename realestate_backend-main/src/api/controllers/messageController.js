@@ -84,6 +84,88 @@ exports.getSupportThread = async (req, res) => {
 };
 
 /**
+ * Get or create chat thread with recipient
+ * POST /api/client/messages/threads
+ */
+exports.getOrCreateThread = async (req, res) => {
+  try {
+    const currentUserId = req.user._id;
+    const { recipientId, listingId, listingType } = req.body;
+
+    if (!recipientId) {
+      return res.status(400).json({
+        success: false,
+        message: "recipientId is required",
+      });
+    }
+
+    // Check if thread already exists between these two users
+    const existingThreadsResult = await messageService.getUserThreads(currentUserId, {
+      type: "user_to_user",
+      limit: 100,
+    });
+    const existingThreads = existingThreadsResult.threads || [];
+
+    const existingThread = existingThreads.find((thread) => {
+      const hasRecipient = thread.participants.some((p) => {
+        const id = p.userId._id || p.userId;
+        return id.toString() === recipientId.toString();
+      });
+
+      if (!hasRecipient) {
+        return false;
+      }
+
+      if (listingId && listingType) {
+        return (
+          thread.metadata?.listingId?.toString() === listingId.toString() &&
+          thread.metadata?.listingType === listingType
+        );
+      }
+
+      return !thread.metadata?.listingId;
+    });
+
+    if (existingThread) {
+      return res.status(200).json({
+        success: true,
+        message: "Thread found",
+        data: existingThread,
+      });
+    }
+
+    // Create new thread
+    const participants = [
+      { userId: currentUserId, role: "user" },
+      { userId: recipientId, role: "owner" },
+    ];
+
+    const thread = await messageService.createThread({
+      participants,
+      type: "user_to_user",
+      status: "active",
+      category: listingType === "vehicle" ? "vehicle" : listingType === "property" ? "property" : "general",
+      metadata: {
+        listingId,
+        listingType,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Thread created successfully",
+      data: thread,
+    });
+  } catch (error) {
+    logger.error(`Get or create thread error: ${error.message}`);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
  * Get user's chat threads
  * GET /api/messages/threads
  */

@@ -14,6 +14,7 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { HeaderWithBackButton } from "@/components/Ui/HeaderWithBackButton";
 import { SuccessModal } from "@/components/Ui";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getMyListings,
   deleteProperty,
@@ -23,7 +24,8 @@ import { useInterest } from "@/contexts/InterestContext";
 
 export default function MyListingsScreen() {
   const router = useRouter();
-  const { isSeller } = useInterest();
+  const { user } = useAuth();
+  const { isSeller, activeView, isBothMode, userInterest } = useInterest();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,6 +92,13 @@ export default function MyListingsScreen() {
   const handleEdit = (propertyId: string) => {
     router.push({
       pathname: "/edit-property",
+      params: { id: propertyId },
+    } as any);
+  };
+
+  const handleBoost = (propertyId: string) => {
+    router.push({
+      pathname: "/boost-listing",
       params: { id: propertyId },
     } as any);
   };
@@ -205,6 +214,14 @@ export default function MyListingsScreen() {
 
           <View style={styles.actionButtons}>
             <TouchableOpacity
+              style={[styles.actionButton, styles.boostButton]}
+              onPress={() => handleBoost(property._id!)}
+            >
+              <Ionicons name="rocket-outline" size={20} color="white" />
+              <Text style={styles.actionButtonText}>Boost</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.actionButton, styles.editButton]}
               onPress={() => handleEdit(property._id!)}
             >
@@ -243,6 +260,14 @@ export default function MyListingsScreen() {
         <Text style={styles.headerTitle}>My Listings</Text>
       </View>
 
+      <View style={styles.boostSummaryCard}>
+        <Text style={styles.boostSummaryLabel}>Boosts remaining</Text>
+        <Text style={styles.boostSummaryValue}>{user?.boost?.number ?? 0}</Text>
+        <Text style={styles.boostSummaryMeta}>
+          Pack: {user?.pack || "freemium"} · Listing slots: {user?.listingConfig?.number || 1}
+        </Text>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -260,7 +285,10 @@ export default function MyListingsScreen() {
             </Text>
             <TouchableOpacity
               style={styles.addFirstButton}
-              onPress={() => router.push("/add-property" as any)}
+              onPress={() => {
+                const targetInterest = isBothMode ? activeView : userInterest;
+                router.push(targetInterest === "cars" ? "/add-car" : "/add-house");
+              }}
             >
               <Text style={styles.addFirstButtonText}>Add Property</Text>
             </TouchableOpacity>
@@ -279,7 +307,10 @@ export default function MyListingsScreen() {
       {properties.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => router.push("/add-property" as any)}
+          onPress={() => {
+            const targetInterest = isBothMode ? activeView : userInterest;
+            router.push(targetInterest === "cars" ? "/add-car" : "/add-house");
+          }}
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={28} color="white" />
@@ -367,6 +398,30 @@ const styles = StyleSheet.create({
     fontFamily: "Raleway-SemiBold",
     color: "#1A1A1A",
     marginBottom: 16,
+  },
+  boostSummaryCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: "#FFF5EC",
+    borderWidth: 1,
+    borderColor: "#FFD7BD",
+  },
+  boostSummaryLabel: {
+    fontSize: 12,
+    color: "#8A8A8A",
+    marginBottom: 4,
+  },
+  boostSummaryValue: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#FF8C42",
+  },
+  boostSummaryMeta: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#666",
   },
   propertyCard: {
     backgroundColor: "white",
@@ -460,7 +515,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 14,
-    fontFamily: "Comfortaa",
+    fontFamily: "raleway-400Regular",
     color: "#666",
   },
   actionButtons: {
@@ -478,6 +533,9 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: "#007AFF",
+  },
+  boostButton: {
+    backgroundColor: "#F85B00",
   },
   deleteButton: {
     backgroundColor: "#FF3B30",

@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "300",
     color: Colors.textPrimary,
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-300Light",
   },
   keypadLetters: {
     fontSize: 10,

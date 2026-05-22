@@ -9,7 +9,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/realestate';
-const API_URL = 'http://192.168.100.4:3000/api';
+const API_URL = 'http://172.20.10.6:3000/api';
 
 async function testSupportFlow() {
   console.log('\n╔═══════════════════════════════════════╗');

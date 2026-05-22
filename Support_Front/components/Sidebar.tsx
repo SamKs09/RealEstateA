@@ -1,97 +1,186 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { 
-  FiMessageSquare, 
-  FiUsers, 
-  FiSettings, 
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  FiMessageSquare,
+  FiUsers,
+  FiSettings,
   FiLogOut,
   FiBarChart2,
-  FiHelpCircle
-} from 'react-icons/fi'
-import NotificationBell from "@/components/NotificationBell";
+  FiHelpCircle,
+  FiChevronLeft,
+  FiChevronRight,
+} from "react-icons/fi";
+
+type UserData = {
+  name?: string;
+  email?: string;
+  role?: string;
+};
 
 export default function Sidebar() {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState('messages')
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+
+  /* ---------------- LOAD STATE ---------------- */
+  useEffect(() => {
+    const user = localStorage.getItem("supportUser");
+    if (user) setUserData(JSON.parse(user));
+
+    const saved = localStorage.getItem("sidebarExpanded");
+    if (saved) setIsExpanded(saved === "true");
+  }, []);
+
+  const toggleSidebar = () => {
+    const next = !isExpanded;
+    setIsExpanded(next);
+    localStorage.setItem("sidebarExpanded", String(next));
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem('supportToken')
-    localStorage.removeItem('supportUser')
-    router.push('/login')
-  }
+    localStorage.removeItem("supportToken");
+    localStorage.removeItem("supportUser");
+    router.push("/login");
+  };
+
+  const getInitials = () => {
+    if (userData?.name) {
+      const parts = userData.name.split(" ");
+      return parts.length > 1
+        ? `${parts[0][0]}${parts.at(-1)?.[0]}`.toUpperCase()
+        : parts[0].slice(0, 2).toUpperCase();
+    }
+    if (userData?.email) return userData.email.slice(0, 2).toUpperCase();
+    return "SU";
+  };
 
   const navItems = [
-    { id: 'messages', icon: FiMessageSquare, label: 'Messages', active: true },
-    { id: 'customers', icon: FiUsers, label: 'Customers' },
-    { id: 'analytics', icon: FiBarChart2, label: 'Analytics' },
-    { id: 'help', icon: FiHelpCircle, label: 'Help' },
-  ]
+    {
+      id: "messages",
+      label: "Messages",
+      icon: FiMessageSquare,
+      route: "/dashboard",
+    },
+    {
+      id: "customers",
+      label: "Customers",
+      icon: FiUsers,
+      route: "/dashboard/customers",
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: FiBarChart2,
+      route: "/dashboard/analytics",
+    },
+    {
+      id: "help",
+      label: "Help Center",
+      icon: FiHelpCircle,
+      route: "/dashboard/help",
+    },
+  ];
 
+  const isActive = (route: string) =>
+    route === "/dashboard" ? pathname === route : pathname?.startsWith(route);
+
+  /* ---------------- JSX ---------------- */
   return (
-    <div className="w-16 bg-gray-900 flex flex-col items-center py-4 border-r border-gray-800">
-      {/* Logo */}
-      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mb-8">
-        <span className="text-white font-bold text-lg">S</span>
+    <aside
+      className={`${
+        isExpanded ? "w-64" : "w-20"
+      } bg-slate-900 border-r border-slate-700 h-screen transition-all duration-300 flex flex-col relative overflow-hidden`}
+    >
+      {/* Toggle */}
+      <div className="p-2 flex justify-end">
+        <button
+          onClick={toggleSidebar}
+          className="w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-lg flex items-center justify-center shadow-lg transition-all"
+        >
+          {isExpanded ? (
+            <FiChevronLeft className="w-5 h-5" />
+          ) : (
+            <FiChevronRight className="w-5 h-5" />
+          )}
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col items-center space-y-2">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group relative ${
-              activeTab === item.id
-                ? 'bg-orange-500 text-white'
-                : 'text-gray-500 hover:bg-gray-800 hover:text-white'
-            }`}
-          >
-            <item.icon className="w-5 h-5" />
-            {/* Tooltip */}
-            <span className="absolute left-14 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-              {item.label}
-            </span>
-          </button>
-        ))}
-        {/* Notification Bell */}
-        <div className="mt-4">
-          <NotificationBell />
-        </div>
-      </nav>
+      <nav className="flex-1 px-2 pt-2 space-y-2 overflow-y-auto min-h-0">
+        {navItems.map((item) => {
+          const active = isActive(item.route);
+          return (
+            <button
+              key={item.id}
+              onClick={() => router.push(item.route)}
+              className={`w-full h-11 rounded-xl flex items-center gap-3 px-4 transition ${
+                active
+                  ? "bg-orange-600 text-white"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              } ${!isExpanded && "justify-center px-0"}`}
+            >
+              <item.icon className="w-5 h-5" />
+              {isExpanded && (
+                <span className="text-sm font-medium">{item.label}</span>
+              )}
+            </button>
+          );
+        })}
 
-      {/* Bottom Actions */}
-      <div className="flex flex-col items-center space-y-2">
+        {/* Settings */}
         <button
-          onClick={() => setActiveTab('settings')}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 group relative ${
-            activeTab === 'settings'
-              ? 'bg-orange-500 text-white'
-              : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+          onClick={() => router.push("/dashboard/settings")}
+          className={`w-full h-11 rounded-xl flex items-center gap-3 px-4 transition text-slate-400 hover:bg-slate-800 hover:text-white ${
+            !isExpanded && "justify-center px-0"
+          } ${
+            pathname?.startsWith("/dashboard/settings") &&
+            "bg-orange-600 text-white"
           }`}
         >
           <FiSettings className="w-5 h-5" />
-          <span className="absolute left-14 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-            Settings
-          </span>
-        </button>
-        
-        <button
-          onClick={handleLogout}
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:bg-red-500/10 hover:text-red-500 transition-all duration-200 group relative"
-        >
-          <FiLogOut className="w-5 h-5" />
-          <span className="absolute left-14 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-            Logout
-          </span>
+          {isExpanded && <span className="text-sm font-medium">Settings</span>}
         </button>
 
-        {/* User Avatar */}
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm mt-2 cursor-pointer">
-          A
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className={`w-full h-11 rounded-xl flex items-center gap-3 px-4 transition text-red-400 hover:bg-red-500/10 ${
+            !isExpanded && "justify-center px-0"
+          }`}
+        >
+          <FiLogOut className="w-5 h-5" />
+          {isExpanded && <span className="text-sm font-medium">Logout</span>}
+        </button>
+      </nav>
+
+      {/* User Profile */}
+      <div className="px-2 py-3 border-t border-slate-700 flex-shrink-0 bg-slate-900">
+        <div
+          onClick={() => router.push("/dashboard/profile")}
+          className={`flex items-center gap-2 cursor-pointer hover:bg-slate-800 p-2 rounded-xl transition ${
+            !isExpanded && "justify-center px-0"
+          }`}
+        >
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {getInitials()}
+          </div>
+
+          {isExpanded && (
+            <div className="overflow-hidden">
+              <div className="text-white text-sm truncate font-medium">
+                {userData?.name || "Support User"}
+              </div>
+              <div className="text-slate-400 text-xs truncate">
+                {userData?.role || "Support Agent"}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  )
+    </aside>
+  );
 }

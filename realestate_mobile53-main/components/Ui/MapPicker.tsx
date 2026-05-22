@@ -21,16 +21,17 @@ interface MapPickerProps {
   onClose: () => void;
   onLocationSelect: (location: { latitude: number; longitude: number }) => void;
   initialLocation?: { latitude: number; longitude: number };
+  readOnly?: boolean;
 }
 
 const { width, height } = Dimensions.get("window");
 
-// Default location (e.g., center of Morocco or a default city)
+// Default location (Center of Tunisia - Balanced view)
 const DEFAULT_LOCATION = {
-  latitude: 33.5731,
-  longitude: -7.5898,
-  latitudeDelta: 0.0922,
-  longitudeDelta: 0.0421,
+  latitude: 34.825,
+  longitude: 9.875,
+  latitudeDelta: 3.0,
+  longitudeDelta: 3.0,
 };
 
 export const MapPicker: React.FC<MapPickerProps> = ({
@@ -38,6 +39,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   onClose,
   onLocationSelect,
   initialLocation,
+  readOnly = false,
 }) => {
   const mapRef = useRef<MapView>(null);
   const [selectedLocation, setSelectedLocation] = useState(
@@ -173,6 +175,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   ];
 
   const handleMapPress = (event: any) => {
+    if (readOnly) return;
     const { latitude, longitude } = event.nativeEvent.coordinate;
     setSelectedLocation({ latitude, longitude });
   };
@@ -195,13 +198,19 @@ export const MapPicker: React.FC<MapPickerProps> = ({
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={28} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Select Location</Text>
-          <TouchableOpacity
-            onPress={handleConfirm}
-            style={styles.confirmButton}
-          >
-            <Text style={styles.confirmText}>Confirm</Text>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {readOnly ? "Location" : "Select Location"}
+          </Text>
+          {!readOnly ? (
+            <TouchableOpacity
+              onPress={handleConfirm}
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmText}>Confirm</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
         </View>
 
         {/* Map */}
@@ -216,6 +225,10 @@ export const MapPicker: React.FC<MapPickerProps> = ({
           showsScale={true}
           showsBuildings={true}
           showsTraffic={false}
+          scrollEnabled={true}
+          zoomEnabled={true}
+          minZoomLevel={5}
+          maxZoomLevel={18}
           initialRegion={{
             latitude:
               currentLocation?.latitude ||
@@ -227,6 +240,14 @@ export const MapPicker: React.FC<MapPickerProps> = ({
               DEFAULT_LOCATION.longitude,
             latitudeDelta: DEFAULT_LOCATION.latitudeDelta,
             longitudeDelta: DEFAULT_LOCATION.longitudeDelta,
+          }}
+          onMapReady={() => {
+            if (mapRef.current) {
+              mapRef.current.setMapBoundaries(
+                { latitude: 37.4, longitude: 11.75 }, // Northeast
+                { latitude: 32.25, longitude: 8.0 }   // Southwest
+              );
+            }
           }}
           onPress={handleMapPress}
         >
@@ -315,9 +336,11 @@ export const MapPicker: React.FC<MapPickerProps> = ({
           <Text style={styles.locationText}>
             Longitude: {selectedLocation.longitude.toFixed(6)}
           </Text>
-          <Text style={styles.helpText}>
-            Tap on the map to select a location
-          </Text>
+          {!readOnly && (
+            <Text style={styles.helpText}>
+              Tap on the map to select a location
+            </Text>
+          )}
         </View>
       </View>
     </Modal>

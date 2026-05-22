@@ -10,10 +10,19 @@ import {
   View,
 } from "react-native";
 import { SuccessModal } from "../../components/Ui";
+import { authService } from "../../services/authService";
+import { useTranslation } from "../../hooks/useTranslation";
+import { Colors } from "../../components/styles";
 
 export default function ResetPassword() {
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const { t } = useTranslation();
+  const params = useLocalSearchParams<{
+    contact: string;
+    otp: string;
+    method: string;
+    verified: string;
+  }>();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -79,23 +88,33 @@ export default function ResetPassword() {
       if (newPassword !== confirmPassword) {
         setErrors((prev) => ({
           ...prev,
-          confirmPassword: "Passwords do not match",
+          confirmPassword: t("validation.passwordsDoNotMatch"),
         }));
         return;
       }
 
-      // Here you would call your reset password API
-      // await resetPassword({
-      //   destination: params.destination,
-      //   newPassword,
-      //   tempToken: params.tempToken
-      // });
+      let result;
+      if (params.method === "email") {
+        result = await authService.resetPasswordEmail({
+          email: params.contact,
+          otp: params.otp,
+          newPassword: newPassword,
+          confirmPassword: confirmPassword,
+        });
+      } else {
+        result = await authService.resetPasswordPhone({
+          phoneNumber: params.contact,
+          code: params.otp,
+          newPassword: newPassword,
+          confirmPassword: confirmPassword,
+        });
+      }
 
-      // Mock API call for demonstration
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // On success
-      setShowSuccessModal(true);
+      if (result.success) {
+        setShowSuccessModal(true);
+      } else {
+        throw new Error(result.message || "Failed to reset password");
+      }
     } catch (error: any) {
       Alert.alert(
         "Reset Failed",
@@ -108,9 +127,9 @@ export default function ResetPassword() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create New Password</Text>
+      <Text style={styles.title}>{t("authentication.createNewPassword")}</Text>
       <Text style={styles.subtitle}>
-        Your new password must be different from previous passwords
+        {t("authentication.passwordDifferentSubtitle")}
       </Text>
 
       {/* New Password Input */}
@@ -138,7 +157,7 @@ export default function ResetPassword() {
         <Text style={styles.errorText}>{errors.password}</Text>
       ) : (
         <Text style={styles.helperText}>
-          Must be at least 8 characters with a number and special character
+          {t("authentication.passwordMinLength")}
         </Text>
       )}
 
@@ -170,6 +189,7 @@ export default function ResetPassword() {
                 ? 1
                 : 0)
           );
+          const strengthLevel = index === 0 ? "weak" : index === 1 ? "fair" : index === 2 ? "good" : "strong";
           return (
             <View
               key={level}
@@ -185,8 +205,8 @@ export default function ResetPassword() {
         {newPassword.length === 0
           ? ""
           : validatePassword(newPassword).valid
-          ? "Strong password"
-          : "Password strength"}
+          ? t("authentication.strongPassword")
+          : t("authentication.passwordStrength")}
       </Text>
 
       {/* Submit Button */}
@@ -200,16 +220,16 @@ export default function ResetPassword() {
         disabled={isLoading || !newPassword || !confirmPassword}
       >
         <Text style={styles.buttonText}>
-          {isLoading ? "Updating..." : "Reset Password"}
+          {isLoading ? t("authentication.updating") : t("authentication.confirm")}
         </Text>
       </TouchableOpacity>
 
       {/* Success Modal */}
       <SuccessModal
         visible={showSuccessModal}
-        title="Password Reset!"
-        message="Your password has been successfully updated"
-        buttonText="Continue to Login"
+        title={t("authentication.success")}
+        message={t("authentication.passwordResetSuccess") || "Your password has been successfully updated"}
+        buttonText={t("authentication.continueToLogin")}
         onClose={() => {
           setShowSuccessModal(false);
           router.replace("./SignIn");
@@ -258,7 +278,7 @@ const styles = StyleSheet.create({
     right: 16,
   },
   visibilityText: {
-    color: "#800080",
+    color: Colors.primary,
     fontWeight: "600",
   },
   helperText: {
@@ -300,7 +320,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   button: {
-    backgroundColor: "#800080",
+    backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: "center",

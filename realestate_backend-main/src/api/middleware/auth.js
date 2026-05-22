@@ -13,8 +13,8 @@ const auth = async (req, res, next) => {
     }
 
     // Extract token from "Bearer <token>" format
-    const token = authHeader.startsWith("Bearer ") 
-      ? authHeader.substring(7) 
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7)
       : authHeader;
 
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
@@ -43,4 +43,33 @@ const auth = async (req, res, next) => {
   }
 };
 
-module.exports = auth;
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.header("Authorization");
+    if (!authHeader) {
+      return next();
+    }
+
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : authHeader;
+
+    try {
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      if (decoded) {
+        const user = await Merchants.findOne({ _id: decoded.id });
+        if (user) {
+          req.user = user;
+        }
+      }
+    } catch (jwtErr) {
+      // Ignore JWT errors in optional auth
+      console.log("Optional auth: Invalid token ignored");
+    }
+    next();
+  } catch (err) {
+    next(); // Always proceed for optional auth
+  }
+};
+
+module.exports = { auth, optionalAuth };

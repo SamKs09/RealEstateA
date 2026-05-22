@@ -1,11 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const messageController = require("../controllers/messageController");
-const auth = require("../middleware/auth");
+const { auth } = require("../middleware/auth");
 const { upload } = require("../utils/multer");
 
 // Get or create support thread
 router.post("/support/thread", auth, messageController.getSupportThread);
+
+// Get or create thread with recipient (for client-to-owner messaging)
+router.post("/threads", auth, messageController.getOrCreateThread);
 
 // Get user threads
 router.get("/threads", auth, messageController.getUserThreads);

@@ -1,5 +1,6 @@
 const Property = require("../models/propertyModel");
 const User = require("../models/userModel");
+const Availability = require("../models/availabilityModel");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -18,29 +19,29 @@ const HTTP_STATUS = {
 };
 
 const MESSAGES = {
-  PROPERTY_CREATED: "Property created successfully",
-  PROPERTY_UPDATED: "Property updated successfully",
-  PROPERTY_DELETED: "Property deleted successfully",
-  PROPERTY_NOT_FOUND: "Property not found",
-  PROPERTY_LIKED: "Property liked successfully",
-  PROPERTY_UNLIKED: "Property unliked successfully",
-  MEDIA_ADDED: "Media added successfully",
-  MEDIA_REMOVED: "Media removed successfully",
-  AVAILABILITY_UPDATED: "Availability updated successfully",
-  UNAUTHORIZED_ACTION: "You are not authorized to perform this action",
-  MEDIA_NOT_FOUND: "Media not found",
-  ALREADY_LIKED: "Property already liked",
-  NOT_LIKED: "Property not liked by user",
-  INVALID_LISTING_TYPE: "Invalid listing type for pricing",
-  INVALID_COORDINATES: "Invalid coordinates provided",
-  INVALID_PROPERTY_TYPE: "Invalid property type",
-  INVALID_LISTING_TYPE_VALUE: "Invalid listing type",
-  INVALID_AREA_UNIT: "Invalid area unit",
-  INVALID_FURNISHING: "Invalid furnishing type",
-  INVALID_RENT_PERIOD: "Invalid rent period",
-  INVALID_CURRENCY: "Invalid currency",
-  INVALID_STATUS: "Invalid status",
-  INVALID_DATE_RANGE: "Available from date must be before available to date",
+  PROPERTY_CREATED: 'propertyCreated',
+  PROPERTY_UPDATED: 'propertyUpdated',
+  PROPERTY_DELETED: 'propertyDeleted',
+  PROPERTY_NOT_FOUND: 'propertyNotFound',
+  PROPERTY_LIKED: 'propertyLiked',
+  PROPERTY_UNLIKED: 'propertyUnliked',
+  MEDIA_ADDED: 'mediaAdded',
+  MEDIA_REMOVED: 'mediaRemoved',
+  AVAILABILITY_UPDATED: 'availabilityUpdated',
+  UNAUTHORIZED_ACTION: 'unauthorized',
+  MEDIA_NOT_FOUND: 'mediaNotFound',
+  ALREADY_LIKED: 'alreadyLiked',
+  NOT_LIKED: 'notLiked',
+  INVALID_LISTING_TYPE: 'invalidListingTypeForPricing',
+  INVALID_COORDINATES: 'invalidCoordinates',
+  INVALID_PROPERTY_TYPE: 'invalidPropertyType',
+  INVALID_LISTING_TYPE_VALUE: 'invalidListingType',
+  INVALID_AREA_UNIT: 'invalidAreaUnit',
+  INVALID_FURNISHING: 'invalidFurnishing',
+  INVALID_RENT_PERIOD: 'invalidRentPeriod',
+  INVALID_CURRENCY: 'invalidCurrency',
+  INVALID_STATUS: 'invalidStatus',
+  INVALID_DATE_RANGE: 'invalidDateRange',
 };
 
 const MAX_MEDIA_FILES = 20;
@@ -52,6 +53,40 @@ const VALID_AREA_UNITS = ['sqft', 'sqm'];
 const VALID_FURNISHING = ['furnished', 'semi-furnished', 'unfurnished'];
 const VALID_RENT_PERIODS = ['daily', 'weekly', 'monthly', 'yearly'];
 const VALID_STATUS = ['active', 'inactive', 'sold', 'rented', 'pending'];
+
+const PACK_LIMITS = {
+  freemium: 1,
+  bronze: 3,
+  silver: 10,
+  gold: 15,
+  platinum: 50,
+};
+
+const isPromotionCurrentlyActive = (item) => {
+  if (!item?.isPromoted || !item?.promotionExpiry) {
+    return false;
+  }
+
+  return new Date(item.promotionExpiry).getTime() > Date.now();
+};
+
+const clearExpiredPromotions = async () => {
+  await Property.updateMany(
+    {
+      isPromoted: true,
+      promotionExpiry: { $lte: new Date() },
+    },
+    {
+      $set: {
+        isPromoted: false,
+        boostPlan: null,
+      },
+      $unset: {
+        promotionExpiry: 1,
+      },
+    },
+  );
+};
 
 // Custom Error Class
 class AppError extends Error {
@@ -75,14 +110,14 @@ const parseFormData = (req, res, next) => {
   try {
     // Parse JSON strings in form-data
     const fieldsToParseAsJSON = [
-      'location', 
-      'propertyDetails', 
-      'pricing', 
-      'availability', 
-      'features', 
+      'location',
+      'propertyDetails',
+      'pricing',
+      'availability',
+      'features',
       'rules'
     ];
-    
+
     fieldsToParseAsJSON.forEach(field => {
       if (req.body[field] && typeof req.body[field] === 'string') {
         try {
@@ -94,7 +129,7 @@ const parseFormData = (req, res, next) => {
         }
       }
     });
-    
+
     // Handle array fields that might come as strings or JSON arrays
     const arrayFields = ['features', 'rules'];
     arrayFields.forEach(field => {
@@ -117,7 +152,7 @@ const parseFormData = (req, res, next) => {
         }
       }
     });
-    
+
     console.log('Final parsed request body:', JSON.stringify(req.body, null, 2));
     next();
   } catch (error) {
@@ -133,18 +168,18 @@ const validateObjectId = (id, fieldName = 'ID') => {
   if (!id || id === 'undefined' || id === 'null') {
     throw new AppError(`${fieldName} is required`, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new AppError(`Invalid ${fieldName} format`, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   return true;
 };
 
 const findPropertyById = async (id) => {
   // Validate ObjectId before querying
   validateObjectId(id, 'Property ID');
-  
+
   const property = await Property.findById(id).populate("owner", "name email avatar phone");
   if (!property) {
     throw new AppError(MESSAGES.PROPERTY_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
@@ -158,47 +193,120 @@ const checkPropertyOwnership = (property, userId) => {
   }
 };
 
-const formatPropertyResponse = (property) => {
+const formatPropertyResponse = (property, currentUserId) => {
+  if (!property) return null;
+
+  // Convert mongoose document to object if needed
+  const propObj = property.toObject ? property.toObject() : property;
+
   // Helper function to convert relative paths to full URLs
   const toFullUrl = (path) => {
     if (!path) return path;
-    if (path.startsWith('http')) return path; // Already a full URL
-    // Remove leading slash if present
-    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    return `http://192.168.100.4:3000/${cleanPath}`;
+    const baseUrl = process.env.API_URL || 'http://172.20.10.6:3000';
+
+    // If it's already a full URL, ensure it's normalized
+    if (path.startsWith('http')) {
+      try {
+        const url = new URL(path);
+        let pathname = url.pathname;
+
+        // Check if it's our local media
+        const isLocalMedia = pathname.startsWith('/uploads') || pathname.startsWith('/images-users');
+        
+        if (isLocalMedia) {
+          // Fix potentially broken paths (e.g. /uploads/filename.jpg instead of /uploads/properties/images/filename.jpg)
+          if (pathname.startsWith('/uploads/') && !pathname.includes('/properties/') && !pathname.includes('/vehicles/')) {
+            pathname = `/uploads/properties/images${pathname.replace('/uploads', '')}`;
+          }
+          // Return fresh URL with current baseUrl
+          return `${baseUrl}${pathname.startsWith('/') ? pathname : '/' + pathname}`;
+        }
+      } catch (err) {
+        // Fallback for invalid URLs
+      }
+      return path;
+    }
+
+    // Clean relative path
+    let cleanPath = path.startsWith('/') ? path.substring(1) : path;
+
+    // Check for missing prefix
+    const hasUploadsPrefix = cleanPath.startsWith('uploads/') || cleanPath.startsWith('images-users/');
+    if (!hasUploadsPrefix) {
+      // Default to property images if no prefix
+      return `${baseUrl}/uploads/properties/images/${cleanPath}`;
+    }
+
+    return `${baseUrl}/${cleanPath}`;
   };
 
   // Convert media paths to full URLs
-  const media = property.media ? {
-    images: property.media.images?.map(toFullUrl) || [],
-    videos: property.media.videos?.map(toFullUrl) || [],
-    documents: property.media.documents?.map(toFullUrl) || [],
-    virtualTour: toFullUrl(property.media.virtualTour)
-  } : undefined;
+  const allImages = propObj.media?.images?.map(toFullUrl) || [];
+  const allVideos = propObj.media?.videos?.map(toFullUrl) || [];
+  const allDocs = propObj.media?.documents?.map(toFullUrl) || [];
+
+  // Determine if media is locked
+  // Rule: Locked if user is NOT the owner AND NOT in unlockedBy list
+  const ownerId = property.owner && (property.owner._id || property.owner);
+  const isOwner = !!(currentUserId && ownerId && String(ownerId) === String(currentUserId));
+  const isUnlocked = !!(property.unlockedBy && currentUserId && property.unlockedBy.some(id => String(id) === String(currentUserId)));
+  const isLocked = !isOwner && !isUnlocked;
+
+  // Apply locking restrictions to media URLs
+  // Images: First 2 are clear, rest are placeholders if locked
+  let visibleImages = allImages;
+  if (isLocked && allImages.length > 2) {
+    visibleImages = [
+      ...allImages.slice(0, 2),
+      ...allImages.slice(2).map(() => 'locked_image_placeholder')
+    ];
+  }
+
+  // Videos: Placeholder if locked
+  let visibleVideos = allVideos;
+  if (isLocked && allVideos.length > 0) {
+    visibleVideos = allVideos.map(() => 'locked_video_placeholder');
+  }
+
+  const media = {
+    images: visibleImages,
+    videos: visibleVideos,
+    documents: isLocked ? [] : allDocs,
+    virtualTour: isLocked ? null : toFullUrl(propObj.media?.virtualTour),
+    // Metadata for UI
+    totalImagesCount: allImages.length,
+    totalVideosCount: allVideos.length,
+    hasVideo: allVideos.length > 0,
+    isLocked: isLocked // Ensure isLocked is also inside media if needed
+  };
 
   return {
-    id: property._id,
-    owner: property.owner,
-    title: property.title,
-    description: property.description,
-    type: property.type,
-    listingType: property.listingType,
-    propertyDetails: property.propertyDetails,
-    location: property.location,
-    pricing: property.pricing,
+    id: propObj._id,
+    owner: propObj.owner,
+    title: propObj.title,
+    description: propObj.description,
+    type: propObj.type,
+    listingType: propObj.listingType,
+    propertyDetails: propObj.propertyDetails,
+    location: propObj.location,
+    pricing: propObj.pricing,
     media: media,
-    availability: property.availability,
+    availability: propObj.availability,
     features: property.features,
     rules: property.rules,
     status: property.status,
     views: property.views,
     likes: property.likes?.length || 0,
-    isPromoted: property.isPromoted,
-    promotionExpiry: property.promotionExpiry,
+    isPromoted: isPromotionCurrentlyActive(property),
+    promotionExpiry: isPromotionCurrentlyActive(property) ? property.promotionExpiry : null,
+    boostPlan: isPromotionCurrentlyActive(property) ? property.boostPlan || null : null,
+    isLocked: isLocked, // Pass lock status to UI
     createdAt: property.createdAt,
     updatedAt: property.updatedAt,
   };
 };
+
+// Media Unlock function
 
 // Enhanced media processing helper
 const processUploadedMedia = (files) => {
@@ -241,7 +349,7 @@ const processUploadedMedia = (files) => {
 // Enhanced file cleanup helper
 const cleanupUploadedFiles = (files) => {
   if (!files || typeof files !== 'object') return;
-  
+
   try {
     Object.values(files).flat().forEach(file => {
       if (file && file.path && fs.existsSync(file.path)) {
@@ -257,11 +365,11 @@ const cleanupUploadedFiles = (files) => {
 // Enhanced file deletion helper
 const deleteMediaFile = (mediaUrl, mediaType) => {
   if (!mediaUrl) return false;
-  
+
   try {
     const filename = mediaUrl.split('/').pop();
     const filePath = path.join(__dirname, `../uploads/properties/${mediaType}`, filename);
-    
+
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
       console.log(`Deleted media file: ${filePath}`);
@@ -279,27 +387,27 @@ const deleteMediaFile = (mediaUrl, mediaType) => {
 // Validation helpers
 const validateEnumFields = (data) => {
   const { type, listingType, propertyDetails, pricing, status } = data;
-  
+
   if (type && !VALID_PROPERTY_TYPES.includes(type)) {
     throw new AppError(MESSAGES.INVALID_PROPERTY_TYPE, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (listingType && !VALID_LISTING_TYPES.includes(listingType)) {
     throw new AppError(MESSAGES.INVALID_LISTING_TYPE_VALUE, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (propertyDetails?.areaUnit && !VALID_AREA_UNITS.includes(propertyDetails.areaUnit)) {
     throw new AppError(MESSAGES.INVALID_AREA_UNIT, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (propertyDetails?.furnishing && !VALID_FURNISHING.includes(propertyDetails.furnishing)) {
     throw new AppError(MESSAGES.INVALID_FURNISHING, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (pricing?.rentPeriod && !VALID_RENT_PERIODS.includes(pricing.rentPeriod)) {
     throw new AppError(MESSAGES.INVALID_RENT_PERIOD, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   if (status && !VALID_STATUS.includes(status)) {
     throw new AppError(MESSAGES.INVALID_STATUS, HTTP_STATUS.BAD_REQUEST);
   }
@@ -307,7 +415,7 @@ const validateEnumFields = (data) => {
 
 const validateNumericFields = (data) => {
   const { propertyDetails, pricing } = data;
-  
+
   // Validate propertyDetails numeric fields
   if (propertyDetails) {
     const numericFields = ['bedrooms', 'bathrooms', 'area', 'parking', 'age'];
@@ -317,7 +425,7 @@ const validateNumericFields = (data) => {
       }
     });
   }
-  
+
   // Validate pricing numeric fields
   if (pricing) {
     const pricingFields = ['salePrice', 'rentPrice', 'deposit', 'maintenanceCharges'];
@@ -355,14 +463,14 @@ const validateCoordinates = (coordinates) => {
 
 const validateRequiredFields = (data) => {
   const { title, description, type, listingType, location } = data;
-  
+
   if (!title || !description || !type || !listingType) {
     throw new AppError(
       "Missing required fields: title, description, type, and listingType are required",
       HTTP_STATUS.BAD_REQUEST
     );
   }
-  
+
   if (!location || !location.address || !location.city || !location.country) {
     throw new AppError(
       "Address, city, and country are required in location",
@@ -385,32 +493,56 @@ const incrementPropertyViews = async (propertyId) => {
 
 // Enhanced media count validation
 const validateMediaLimits = (currentMedia, newMedia) => {
-  const currentCount = 
+  const currentCount =
     (currentMedia.images?.length || 0) +
     (currentMedia.videos?.length || 0) +
     (currentMedia.documents?.length || 0);
-  
-  const newCount = 
-    (newMedia.images?.length || 0) + 
-    (newMedia.videos?.length || 0) + 
+
+  const newCount =
+    (newMedia.images?.length || 0) +
+    (newMedia.videos?.length || 0) +
     (newMedia.documents?.length || 0);
 
   if (currentCount + newCount > MAX_MEDIA_FILES) {
     throw new AppError(
-      `Maximum ${MAX_MEDIA_FILES} media files allowed. Current: ${currentCount}, Attempting to add: ${newCount}`, 
+      `Maximum ${MAX_MEDIA_FILES} media files allowed. Current: ${currentCount}, Attempting to add: ${newCount}`,
       HTTP_STATUS.BAD_REQUEST
     );
   }
-  
+
   return { currentCount, newCount, totalAfter: currentCount + newCount };
 };
 
 // Property CRUD Operations
 const createProperty = catchAsync(async (req, res) => {
+      // ENFORCE: Only sellers/renters can post, and pack-based posting limit
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+      if (user.role !== 'seller' && user.role !== 'renter') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+          success: false,
+          message: 'Only sellers or renters can post properties',
+        });
+      }
+      const userPack = user.pack || 'freemium';
+      const maxListings = user.listingConfig?.number || PACK_LIMITS[userPack] || 1;
+      const currentListings = (user.propertyListings ? user.propertyListings.length : 0)
+        + (user.vehicleListings ? user.vehicleListings.length : 0);
+      if (currentListings >= maxListings) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+          success: false,
+          message: `Your current pack ('${userPack}') allows posting up to ${maxListings} listings. Upgrade your pack to add more listings.`,
+        });
+      }
   try {
     console.log('Raw request body before parsing:', req.body);
     console.log('Creating property with files:', req.files ? Object.keys(req.files) : 'none');
-    
+
     const {
       title,
       description,
@@ -426,36 +558,36 @@ const createProperty = catchAsync(async (req, res) => {
 
     // Validate required fields
     validateRequiredFields(req.body);
-    
+
     // Validate enum fields
     validateEnumFields(req.body);
-    
+
     // Validate numeric fields
     validateNumericFields(req.body);
-    
+
     // Validate coordinates
     validateCoordinates(location?.coordinates);
-    
+
     // Validate pricing consistency
     validatePricingConsistency(listingType, pricing || {});
-    
+
     // Validate availability dates
     validateAvailabilityDates(availability);
 
     // Process uploaded media
     const mediaData = processUploadedMedia(req.files);
-    
+
     // Check media limits for new property
-    const totalMediaCount = 
-      mediaData.images.length + 
-      mediaData.videos.length + 
+    const totalMediaCount =
+      mediaData.images.length +
+      mediaData.videos.length +
       mediaData.documents.length;
 
     if (totalMediaCount > MAX_MEDIA_FILES) {
       // Cleanup uploaded files
       cleanupUploadedFiles(req.files);
       throw new AppError(
-        `Maximum ${MAX_MEDIA_FILES} media files allowed`, 
+        `Maximum ${MAX_MEDIA_FILES} media files allowed`,
         HTTP_STATUS.BAD_REQUEST
       );
     }
@@ -485,6 +617,24 @@ const createProperty = catchAsync(async (req, res) => {
     const property = await Property.create(propertyData);
     await property.populate("owner", "name email avatar phone");
 
+    // Auto-create Availability document for this property
+    try {
+      await Availability.create({
+        listingType: 'property',
+        listingId: property._id,
+        owner: property.owner._id || property.owner,
+        defaultAvailable: propertyData.availability?.isAvailable !== false,
+        availableRanges: [],
+        blockedRanges: [],
+        bookedRanges: [],
+        minRentalDays: 1,
+      });
+      console.log(`📅 Auto-created Availability for property: ${property._id}`);
+    } catch (availErr) {
+      // Non-fatal — availability can be lazily created by getAvailability
+      console.warn('⚠️ Could not auto-create Availability for property:', availErr.message);
+    }
+
     // Add property to user's propertyListings array
     try {
       await User.findByIdAndUpdate(
@@ -500,8 +650,8 @@ const createProperty = catchAsync(async (req, res) => {
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
-      message: MESSAGES.PROPERTY_CREATED,
-      data: formatPropertyResponse(property),
+      message: req.t(MESSAGES.PROPERTY_CREATED),
+      data: formatPropertyResponse(property, req.user.id),
     });
   } catch (error) {
     // Cleanup files on error
@@ -513,13 +663,13 @@ const createProperty = catchAsync(async (req, res) => {
 
 const getProperty = catchAsync(async (req, res) => {
   const { id } = req.params;
-  
+
   const property = await findPropertyById(id);
   incrementPropertyViews(id).catch(console.error);
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    data: formatPropertyResponse(property),
+    data: formatPropertyResponse(property, req.user?.id),
   });
 });
 
@@ -527,34 +677,34 @@ const updateProperty = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
-    
+
     console.log('Updating property with files:', req.files ? Object.keys(req.files) : 'none');
-    
+
     const property = await findPropertyById(id);
     checkPropertyOwnership(property, req.user.id);
-    
+
     // Validate enum fields for update data
     validateEnumFields(updateData);
-    
+
     // Validate numeric fields for update data
     validateNumericFields(updateData);
-    
+
     // Validate coordinates if being updated
     if (updateData.location?.coordinates) {
       validateCoordinates(updateData.location.coordinates);
     }
-    
+
     // Validate availability dates if being updated
     if (updateData.availability) {
       const mergedAvailability = { ...property.availability.toObject(), ...updateData.availability };
       validateAvailabilityDates(mergedAvailability);
     }
-    
+
     // Check pricing consistency
     const newListingType = updateData.listingType || property.listingType;
     const newPricing = { ...property.pricing.toObject(), ...updateData.pricing };
     validatePricingConsistency(newListingType, newPricing);
-    
+
     // Trim title if provided
     if (updateData.title) {
       updateData.title = updateData.title.trim();
@@ -563,7 +713,7 @@ const updateProperty = catchAsync(async (req, res) => {
     // Process uploaded media if any
     if (req.files && Object.keys(req.files).length > 0) {
       const newMediaData = processUploadedMedia(req.files);
-      
+
       // Validate media limits
       try {
         validateMediaLimits(property.media, newMediaData);
@@ -574,7 +724,7 @@ const updateProperty = catchAsync(async (req, res) => {
 
       // Merge media data using MongoDB $push operations
       const mediaUpdates = {};
-      
+
       if (newMediaData.images.length > 0) {
         mediaUpdates['media.images'] = { $each: newMediaData.images };
       }
@@ -589,7 +739,7 @@ const updateProperty = catchAsync(async (req, res) => {
       if (Object.keys(mediaUpdates).length > 0) {
         updateData.$push = mediaUpdates;
       }
-      
+
       // Handle virtualTour separately (replace, not push)
       if (newMediaData.virtualTour) {
         // Delete old virtualTour file if exists
@@ -599,24 +749,32 @@ const updateProperty = catchAsync(async (req, res) => {
         updateData['media.virtualTour'] = newMediaData.virtualTour;
       }
     }
-    
+
     const updatedProperty = await Property.findByIdAndUpdate(
       id,
-      { 
+      {
         ...updateData,
         updatedAt: new Date()
       },
-      { 
-        new: true, 
+      {
+        new: true,
         runValidators: true,
         context: 'query'
       }
     ).populate("owner", "name email avatar phone");
-    
+
+    // Sync Availability.defaultAvailable if availability.isAvailable changed
+    if (updateData.availability?.isAvailable !== undefined) {
+      await Availability.findOneAndUpdate(
+        { listingType: 'property', listingId: id },
+        { defaultAvailable: updateData.availability.isAvailable }
+      ).catch(err => console.warn('⚠️ Could not sync Availability on property update:', err.message));
+    }
+
     res.status(HTTP_STATUS.OK).json({
       success: true,
-      message: MESSAGES.PROPERTY_UPDATED,
-      data: formatPropertyResponse(updatedProperty),
+      message: req.t(MESSAGES.PROPERTY_UPDATED),
+      data: formatPropertyResponse(updatedProperty, req.user.id),
     });
   } catch (error) {
     // Cleanup files on error
@@ -628,10 +786,10 @@ const updateProperty = catchAsync(async (req, res) => {
 
 const deleteProperty = catchAsync(async (req, res) => {
   const { id } = req.params;
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
-  
+
   // Delete associated media files
   const mediaTypes = ['images', 'videos', 'documents'];
   mediaTypes.forEach(type => {
@@ -641,14 +799,14 @@ const deleteProperty = catchAsync(async (req, res) => {
       });
     }
   });
-  
+
   // Handle virtualTour deletion
   if (property.media.virtualTour) {
     deleteMediaFile(property.media.virtualTour, 'virtualTour');
   }
-  
+
   await Property.findByIdAndDelete(id);
-  
+
   // Remove property from user's propertyListings array
   try {
     await User.findByIdAndUpdate(
@@ -661,17 +819,17 @@ const deleteProperty = catchAsync(async (req, res) => {
     console.error('⚠️ Failed to remove property from user propertyListings:', error);
     // Don't fail the request, just log the error
   }
-  
+
   res.status(HTTP_STATUS.NO_CONTENT).json({
     success: true,
-    message: MESSAGES.PROPERTY_DELETED,
+    message: req.t(MESSAGES.PROPERTY_DELETED),
   });
 });
 
 // Enhanced Media Management
 const uploadMedia = catchAsync(async (req, res) => {
   const { id } = req.params;
-  
+
   // Validate property ID first
   try {
     validateObjectId(id, 'Property ID');
@@ -682,16 +840,16 @@ const uploadMedia = catchAsync(async (req, res) => {
     }
     throw error;
   }
-  
+
   console.log('Uploading media for property:', id);
   console.log('Files received:', req.files ? Object.keys(req.files) : 'none');
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
 
   // Process uploaded files
   const mediaData = processUploadedMedia(req.files);
-  
+
   // Validate media limits
   try {
     const limits = validateMediaLimits(property.media, mediaData);
@@ -703,11 +861,11 @@ const uploadMedia = catchAsync(async (req, res) => {
 
   // Build update query
   const updateOperations = {};
-  
+
   // Use $push with $each for arrays
   if (mediaData.images.length > 0 || mediaData.videos.length > 0 || mediaData.documents.length > 0) {
     updateOperations.$push = {};
-    
+
     if (mediaData.images.length > 0) {
       updateOperations.$push['media.images'] = { $each: mediaData.images };
     }
@@ -725,7 +883,7 @@ const uploadMedia = catchAsync(async (req, res) => {
     if (property.media.virtualTour) {
       deleteMediaFile(property.media.virtualTour, 'virtualTour');
     }
-    
+
     if (!updateOperations.$set) {
       updateOperations.$set = {};
     }
@@ -750,9 +908,9 @@ const uploadMedia = catchAsync(async (req, res) => {
 
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    message: MESSAGES.MEDIA_ADDED,
+    message: req.t(MESSAGES.MEDIA_ADDED),
     data: {
-      property: formatPropertyResponse(updatedProperty),
+      property: formatPropertyResponse(updatedProperty, req.user.id),
       uploadedMedia: uploadedUrls
     },
   });
@@ -761,15 +919,15 @@ const uploadMedia = catchAsync(async (req, res) => {
 const deleteMedia = catchAsync(async (req, res) => {
   const { id, mediaId } = req.params;
   const { mediaType = 'images' } = req.query;
-  
+
   console.log(`Deleting media: propertyId=${id}, mediaId=${mediaId}, type=${mediaType}`);
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
-  
+
   let mediaToRemove;
   let updateOperation = {};
-  
+
   // Find and remove media from property
   if (mediaType === 'virtualTour') {
     mediaToRemove = property.media.virtualTour;
@@ -782,29 +940,29 @@ const deleteMedia = catchAsync(async (req, res) => {
     // Handle array-based media (images, videos, documents)
     const mediaArray = property.media[mediaType] || [];
     mediaToRemove = mediaArray.find(url => url.includes(mediaId));
-    
+
     if (!mediaToRemove) {
       throw new AppError(MESSAGES.MEDIA_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
-    
+
     // Use $pull to remove from array
     updateOperation = { $pull: { [`media.${mediaType}`]: mediaToRemove } };
   }
 
   // Delete from file storage
   const deleteSuccess = deleteMediaFile(mediaToRemove, mediaType);
-  
+
   if (!deleteSuccess) {
     console.warn(`File not found in storage: ${mediaToRemove}`);
   }
 
   // Update database
   await Property.findByIdAndUpdate(id, updateOperation);
-  
+
   // Return success response
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    message: MESSAGES.MEDIA_REMOVED,
+    message: req.t(MESSAGES.MEDIA_REMOVED),
     data: {
       removedMedia: {
         type: mediaType,
@@ -823,19 +981,19 @@ const removeMedia = deleteMedia;
 const likeProperty = catchAsync(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  
+
   const property = await findPropertyById(id);
-  
+
   if (property.likes.includes(userId)) {
     throw new AppError(MESSAGES.ALREADY_LIKED, HTTP_STATUS.CONFLICT);
   }
-  
+
   property.likes.push(userId);
   await property.save();
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    message: MESSAGES.PROPERTY_LIKED,
+    message: req.t(MESSAGES.PROPERTY_LIKED),
     data: {
       likes: property.likes.length,
     },
@@ -845,19 +1003,19 @@ const likeProperty = catchAsync(async (req, res) => {
 const unlikeProperty = catchAsync(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  
+
   const property = await findPropertyById(id);
-  
+
   if (!property.likes.includes(userId)) {
     throw new AppError(MESSAGES.NOT_LIKED, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   property.likes.pull(userId);
   await property.save();
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    message: MESSAGES.PROPERTY_UNLIKED,
+    message: req.t(MESSAGES.PROPERTY_UNLIKED),
     data: {
       likes: property.likes.length,
     },
@@ -866,6 +1024,8 @@ const unlikeProperty = catchAsync(async (req, res) => {
 
 // Search and Filter
 const searchProperties = catchAsync(async (req, res) => {
+  await clearExpiredPromotions();
+
   const {
     page = 1,
     limit = 10,
@@ -888,55 +1048,58 @@ const searchProperties = catchAsync(async (req, res) => {
     areaUnit,
     ...otherFilters
   } = req.query;
-  
+
   const searchQuery = { status };
-  
+
   // Basic filters
   if (type) searchQuery.type = type;
   if (listingType) searchQuery.listingType = listingType;
-  
+
   // Location filters
   if (city) searchQuery['location.city'] = new RegExp(city, 'i');
   if (state) searchQuery['location.state'] = new RegExp(state, 'i');
   if (country) searchQuery['location.country'] = new RegExp(country, 'i');
-  
+
   // Price filters
-  if (listingType === 'sale' && (minPrice || maxPrice)) {
-    searchQuery['pricing.salePrice'] = {};
-    if (minPrice) searchQuery['pricing.salePrice'].$gte = parseInt(minPrice);
-    if (maxPrice) searchQuery['pricing.salePrice'].$lte = parseInt(maxPrice);
+  if (minPrice || maxPrice) {
+    if (listingType) {
+      const priceField = listingType === 'rent' ? 'pricing.rentPrice' : 'pricing.salePrice';
+      searchQuery[priceField] = {};
+      if (minPrice) searchQuery[priceField].$gte = parseInt(minPrice);
+      if (maxPrice) searchQuery[priceField].$lte = parseInt(maxPrice);
+    } else {
+      // Default to checking both or sale if no listingType provided
+      searchQuery.$or = [
+        { 'pricing.salePrice': { $gte: parseInt(minPrice || 0), $lte: parseInt(maxPrice || 100000000) } },
+        { 'pricing.rentPrice': { $gte: parseInt(minPrice || 0), $lte: parseInt(maxPrice || 100000000) } }
+      ];
+    }
   }
-  
-  if (listingType === 'rent' && (minPrice || maxPrice)) {
-    searchQuery['pricing.rentPrice'] = {};
-    if (minPrice) searchQuery['pricing.rentPrice'].$gte = parseInt(minPrice);
-    if (maxPrice) searchQuery['pricing.rentPrice'].$lte = parseInt(maxPrice);
-  }
-  
+
   // Property detail filters
   if (bedrooms) searchQuery['propertyDetails.bedrooms'] = { $gte: parseInt(bedrooms) };
   if (bathrooms) searchQuery['propertyDetails.bathrooms'] = { $gte: parseInt(bathrooms) };
   if (furnishing) searchQuery['propertyDetails.furnishing'] = furnishing;
   if (areaUnit) searchQuery['propertyDetails.areaUnit'] = areaUnit;
-  
+
   // Area filters
   if (minArea || maxArea) {
     searchQuery['propertyDetails.area'] = {};
     if (minArea) searchQuery['propertyDetails.area'].$gte = parseInt(minArea);
     if (maxArea) searchQuery['propertyDetails.area'].$lte = parseInt(maxArea);
   }
-  
+
   // Array filters
   if (amenities) {
     const amenitiesArray = Array.isArray(amenities) ? amenities : [amenities];
     searchQuery['propertyDetails.amenities'] = { $in: amenitiesArray };
   }
-  
+
   if (features) {
     const featuresArray = Array.isArray(features) ? features : [features];
     searchQuery.features = { $in: featuresArray };
   }
-  
+
   // Text search
   if (otherFilters.search) {
     searchQuery.$or = [
@@ -946,20 +1109,26 @@ const searchProperties = catchAsync(async (req, res) => {
       { 'location.landmark': new RegExp(otherFilters.search, 'i') }
     ];
   }
-  
+
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  
+
+  // Prioritize promoted listings: promoted first (by expiry desc), then normal sort
+  const promotedSort = { isPromoted: -1, promotionExpiry: -1 };
+  const combinedSort = typeof sort === 'string'
+    ? { ...promotedSort, [sort.replace('-', '')]: sort.startsWith('-') ? -1 : 1 }
+    : { ...promotedSort, createdAt: -1 };
+
   const [properties, total] = await Promise.all([
     Property.find(searchQuery)
       .populate("owner", "name email avatar phone")
-      .sort(sort)
+      .sort(combinedSort)
       .skip(skip)
       .limit(parseInt(limit)),
     Property.countDocuments(searchQuery),
   ]);
-  
-  const formattedProperties = properties.map(formatPropertyResponse);
-  
+
+  const formattedProperties = properties.map(p => formatPropertyResponse(p, req.user?.id));
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: {
@@ -986,27 +1155,27 @@ const searchProperties = catchAsync(async (req, res) => {
 const updateAvailability = catchAsync(async (req, res) => {
   const { id } = req.params;
   const availabilityUpdates = req.body;
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
-  
+
   // Merge with existing availability and validate
   const mergedAvailability = { ...property.availability.toObject(), ...availabilityUpdates };
   validateAvailabilityDates(mergedAvailability);
-  
+
   const updatedProperty = await Property.findByIdAndUpdate(
     id,
-    { 
+    {
       $set: {
         'availability': mergedAvailability
       }
     },
     { new: true, runValidators: true }
   ).populate("owner", "name email avatar phone");
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
-    message: MESSAGES.AVAILABILITY_UPDATED,
+    message: req.t(MESSAGES.AVAILABILITY_UPDATED),
     data: {
       availability: updatedProperty.availability,
     },
@@ -1017,24 +1186,24 @@ const updateAvailability = catchAsync(async (req, res) => {
 const bulkDeleteMedia = catchAsync(async (req, res) => {
   const { id } = req.params;
   const { mediaItems } = req.body; // Array of { type, url } objects
-  
+
   if (!mediaItems || !Array.isArray(mediaItems) || mediaItems.length === 0) {
     throw new AppError("Media items array is required", HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
-  
+
   const deletedItems = [];
   const failedItems = [];
-  
+
   // Process each media item
   for (const item of mediaItems) {
     const { type, url } = item;
-    
+
     try {
       let found = false;
-      
+
       if (type === 'virtualTour') {
         if (property.media.virtualTour === url) {
           found = true;
@@ -1047,7 +1216,7 @@ const bulkDeleteMedia = catchAsync(async (req, res) => {
           await Property.findByIdAndUpdate(id, { $pull: { [`media.${type}`]: url } });
         }
       }
-      
+
       if (found) {
         const deleteSuccess = deleteMediaFile(url, type);
         deletedItems.push({ type, url, fileDeleted: deleteSuccess });
@@ -1058,7 +1227,7 @@ const bulkDeleteMedia = catchAsync(async (req, res) => {
       failedItems.push({ type, url, reason: error.message });
     }
   }
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: `${deletedItems.length} media items deleted successfully`,
@@ -1077,9 +1246,9 @@ const bulkDeleteMedia = catchAsync(async (req, res) => {
 // Get Media Info
 const getMediaInfo = catchAsync(async (req, res) => {
   const { id } = req.params;
-  
+
   const property = await findPropertyById(id);
-  
+
   const mediaInfo = {
     images: {
       count: property.media.images?.length || 0,
@@ -1098,16 +1267,16 @@ const getMediaInfo = catchAsync(async (req, res) => {
       url: property.media.virtualTour || null
     },
     total: {
-      count: (property.media.images?.length || 0) + 
-             (property.media.videos?.length || 0) + 
-             (property.media.documents?.length || 0),
+      count: (property.media.images?.length || 0) +
+        (property.media.videos?.length || 0) +
+        (property.media.documents?.length || 0),
       maxAllowed: MAX_MEDIA_FILES,
-      remaining: MAX_MEDIA_FILES - ((property.media.images?.length || 0) + 
-                                   (property.media.videos?.length || 0) + 
-                                   (property.media.documents?.length || 0))
+      remaining: MAX_MEDIA_FILES - ((property.media.images?.length || 0) +
+        (property.media.videos?.length || 0) +
+        (property.media.documents?.length || 0))
     }
   };
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: mediaInfo
@@ -1118,16 +1287,16 @@ const getMediaInfo = catchAsync(async (req, res) => {
 const replaceMedia = catchAsync(async (req, res) => {
   const { id, mediaId } = req.params;
   const { mediaType = 'images' } = req.query;
-  
+
   if (!req.files || !req.files[mediaType]) {
     throw new AppError(`No ${mediaType} file provided for replacement`, HTTP_STATUS.BAD_REQUEST);
   }
-  
+
   const property = await findPropertyById(id);
   checkPropertyOwnership(property, req.user.id);
-  
+
   let oldMediaUrl;
-  
+
   // Find the media to replace
   if (mediaType === 'virtualTour') {
     oldMediaUrl = property.media.virtualTour;
@@ -1143,21 +1312,21 @@ const replaceMedia = catchAsync(async (req, res) => {
       throw new AppError(MESSAGES.MEDIA_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
   }
-  
+
   // Process new media
   const newMediaData = processUploadedMedia(req.files);
-  const newMediaUrl = mediaType === 'virtualTour' 
-    ? newMediaData.virtualTour 
+  const newMediaUrl = mediaType === 'virtualTour'
+    ? newMediaData.virtualTour
     : newMediaData[mediaType][0];
-  
+
   if (!newMediaUrl) {
     cleanupUploadedFiles(req.files);
     throw new AppError('Failed to process new media file', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
-  
+
   // Delete old file
   deleteMediaFile(oldMediaUrl, mediaType);
-  
+
   // Update database
   let updateOperation;
   if (mediaType === 'virtualTour') {
@@ -1171,23 +1340,115 @@ const replaceMedia = catchAsync(async (req, res) => {
       updateOperation = { $set: { [`media.${mediaType}`]: mediaArray } };
     }
   }
-  
+
   const updatedProperty = await Property.findByIdAndUpdate(
     id,
     updateOperation,
     { new: true, runValidators: true }
   ).populate("owner", "name email avatar phone");
-  
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: 'Media replaced successfully',
     data: {
-      property: formatPropertyResponse(updatedProperty),
+      property: formatPropertyResponse(updatedProperty, req.user.id),
       replacedMedia: {
         type: mediaType,
         oldUrl: oldMediaUrl,
         newUrl: newMediaUrl
       }
+    }
+  });
+});
+
+// Boost Plans Configuration
+const BOOST_PLANS = {
+  '1day': { duration: 1, cost: 1, label: '1 day boost', visibility: 'Top of search' },
+  '3day': { duration: 3, cost: 1, label: '3 day boost', visibility: 'Top of search' },
+  '7day': { duration: 7, cost: 1, label: '7 day boost', visibility: 'Top of search' },
+};
+
+// Boost Property
+const boostProperty = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { boostPlan } = req.body;
+  const userId = req.user.id;
+
+  // Validate boost plan
+  if (!boostPlan || !BOOST_PLANS[boostPlan]) {
+    throw new AppError(
+      'Invalid boost plan. Choose 1day, 3day, or 7day.',
+      HTTP_STATUS.BAD_REQUEST
+    );
+  }
+
+  const plan = BOOST_PLANS[boostPlan];
+
+  // Find and validate property
+  const property = await findPropertyById(id);
+  checkPropertyOwnership(property, userId);
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError('User not found.', HTTP_STATUS.NOT_FOUND);
+  }
+
+  // Check property is active
+  if (property.status !== 'active') {
+    throw new AppError(
+      'Only active listings can be boosted.',
+      HTTP_STATUS.BAD_REQUEST
+    );
+  }
+
+  if (!user.boost?.number || user.boost.number <= 0) {
+    throw new AppError(
+      'No boosts remaining on your current pack. Purchase a new pack or start a trial to boost this listing.',
+      HTTP_STATUS.FORBIDDEN
+    );
+  }
+
+  // Set promotion on property (new boost replaces any existing one)
+  const now = new Date();
+  const expiryDate = new Date(now.getTime() + plan.duration * 24 * 60 * 60 * 1000);
+
+  user.boost.number -= 1;
+  user.boost.status = user.boost.number > 0;
+  await user.save();
+
+  const updatedProperty = await Property.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        isPromoted: true,
+        promotionExpiry: expiryDate,
+        boostPlan: boostPlan,
+      }
+    },
+    { new: true, runValidators: true }
+  ).populate('owner', 'name email avatar phone');
+
+  console.log(`✅ Property ${id} boosted with ${boostPlan} plan.`);
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: `Listing boosted successfully with ${plan.label}!`,
+    data: {
+      property: formatPropertyResponse(updatedProperty, userId),
+      boost: {
+        plan: boostPlan,
+        label: plan.label,
+        expiryDate: expiryDate,
+        cost: plan.cost,
+      },
+      user: {
+        _id: user._id,
+        pack: user.pack,
+        boost: user.boost,
+        listingConfig: user.listingConfig,
+        trial: user.trial,
+      },
     }
   });
 });
@@ -1200,17 +1461,17 @@ const getUserProperties = catchAsync(async (req, res) => {
     sort = '-createdAt',
     status,
   } = req.query;
-  
+
   // Build query to get properties owned by the authenticated user
   const searchQuery = { owner: req.user.id };
-  
+
   // Optional: filter by status
   if (status) {
     searchQuery.status = status;
   }
-  
+
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  
+
   const [properties, total] = await Promise.all([
     Property.find(searchQuery)
       .populate("owner", "name email avatar phone")
@@ -1219,9 +1480,52 @@ const getUserProperties = catchAsync(async (req, res) => {
       .limit(parseInt(limit)),
     Property.countDocuments(searchQuery),
   ]);
-  
-  const formattedProperties = properties.map(formatPropertyResponse);
-  
+
+  const formattedProperties = properties.map(p => formatPropertyResponse(p, req.user.id));
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: {
+      properties: formattedProperties,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalProperties: total,
+        hasNextPage: skip + properties.length < total,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    },
+  });
+});
+
+// Get properties for a specific user (Public)
+const getPublicUserProperties = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const {
+    page = 1,
+    limit = 20,
+    sort = '-createdAt',
+  } = req.query;
+
+  // Validate userId
+  validateObjectId(userId, 'User ID');
+
+  // Build query: properties owned by the specific user, and MUST be active
+  const searchQuery = { owner: userId, status: 'active' };
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [properties, total] = await Promise.all([
+    Property.find(searchQuery)
+      .populate("owner", "name email avatar phone")
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit)),
+    Property.countDocuments(searchQuery),
+  ]);
+
+  const formattedProperties = properties.map(p => formatPropertyResponse(p, req.user?.id));
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: {
@@ -1251,9 +1555,12 @@ module.exports = {
   unlikeProperty,
   searchProperties,
   getUserProperties, // Get authenticated user's properties
+  getPublicUserProperties, // Get specific user's properties
   updateAvailability,
   bulkDeleteMedia,
   getMediaInfo,
   replaceMedia,
+  boostProperty, // Boost listing for increased visibility
+  // unlockPropertyMedia, // Removed because it is not defined
   formatPropertyResponse // Export for use in other controllers
 };

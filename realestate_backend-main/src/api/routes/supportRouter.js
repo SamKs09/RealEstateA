@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const supportCtrl = require("../controllers/supportController");
-const auth = require("../middleware/auth");
+const { auth } = require("../middleware/auth");
 const { uploadSupportAttachments } = require("../utils/multer");
 
 // Send a message (User)

@@ -8,24 +8,29 @@ import {
   Switch,
   Modal,
   FlatList,
-  Alert,
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../contexts/AuthContext";
+import { useInterest } from "../../contexts/InterestContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { ScreenWrapper } from "../../components/Ui";
-import i18n from "../../services/i18n";
+import { BottomSheet, BottomSheetModalMethods } from "../../components/Ui/BottomSheet";
+import i18n, { supportedLanguages } from "../../services/i18n";
+import { usePopup } from "../../contexts/PopupContext";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { currentLanguage, supportedLanguages, changeLanguage, t } =
-    useLanguage();
+  const { userRole, activeView } = useInterest();
+  const { currentLanguage, changeLanguage } = useLanguage();
+  const { t } = useTranslation();
+  const { showConfirm, showError } = usePopup();
   const [showLanguageModal, setShowLanguageModal] = React.useState(false);
-  const [showAccountModal, setShowAccountModal] = React.useState(false);
+  const accountBottomSheetRef = React.useRef<BottomSheetModalMethods>(null);
   const [locale, setLocale] = React.useState(i18n.locale);
 
   // Sample accounts - replace with real data from your auth system
@@ -46,6 +51,12 @@ export default function SettingsScreen() {
     },
   ]);
 
+  // Determine if user is a seller
+  const isSeller = userRole === "seller" || user?.userType === "seller";
+
+  // Note: Removed refreshProfile from useFocusEffect to prevent infinite loop
+  // The user data is already kept in sync through AuthContext
+
   // Listen for language changes - same pattern as _layout.tsx
   React.useEffect(() => {
     const checkLocale = setInterval(() => {
@@ -59,89 +70,106 @@ export default function SettingsScreen() {
 
   // Handle logout with confirmation
   const handleLogout = React.useCallback(async () => {
-    Alert.alert(
+    showConfirm(
       t("settings.logoutConfirmTitle"),
       t("settings.logoutConfirmMessage"),
-      [
-        {
+      {
+        secondaryAction: {
           text: t("settings.cancel"),
           style: "cancel",
         },
-        {
+        primaryAction: {
           text: t("settings.logout"),
           style: "destructive",
           onPress: async () => {
             try {
               await logout();
-              // Navigate to signin screen
               router.replace("/auth/SignIn" as any);
             } catch (error) {
               console.error("Logout failed:", error);
-              Alert.alert(t("settings.error"), t("settings.logoutError"));
+              showError(t("settings.logoutError"), t("settings.error"));
             }
           },
         },
-      ]
+      }
     );
-  }, [t, logout, router]);
+  }, [t, logout, router, showConfirm, showError]);
 
   const settingsOptions = React.useMemo(
     () => [
-      // Reorder and present items to match design exactly
+      // Seller-specific options (only show for sellers)
+      ...(isSeller ? [{
+        id: "seller_dashboard",
+        title: t("settings.myListings"),
+        iconSource: require("../../assets/Icons/list_alt.png"),
+        type: "navigation",
+        onPress: () => router.push("/seller-dashboard" as any),
+      }] : []),
+      // Profile-related menu items (moved from profile tab)
+      {
+        id: "subscription_packs",
+        title: "Subscription Packs",
+        iconSource: require("../../assets/settings/purchasing.png"),
+        type: "navigation",
+        onPress: () => router.push("/profile/subscription" as any),
+      },
+      ...(!isSeller ? [{
+        id: "saved_items",
+        title:
+          activeView === "cars"
+            ? t("settings.savedCars") || "Saved Cars"
+            : t("settings.savedProperties") || "Saved Properties",
+        iconSource: require("../../assets/settings/purchasing.png"),
+        type: "navigation",
+        onPress: () => router.push("/saved-listings" as any),
+      }] : []),
+      // Original settings items
       {
         id: "payments",
         title: t("settings.payments"),
-        iconSource: require("../../assets/Icons/payments.png"),
+        iconSource: require("../../assets/settings/bill.png"),
         type: "navigation",
-        onPress: () => console.log("Navigate to Payments"),
-      },
-      {
-        id: "history",
-        title: t("settings.history"),
-        iconSource: require("../../assets/Icons/History.png"),
-        type: "navigation",
-        onPress: () => console.log("Navigate to History"),
+        onPress: () => router.push("/payment-history" as any),
       },
       {
         id: "notifications",
         title: t("settings.notificationSettings"),
-        iconSource: require("../../assets/Icons/Notification Settings.png"),
+        iconSource: require("../../assets/settings/bell.png"),
         type: "navigation",
-        onPress: () => console.log("Navigate to Notification Settings"),
+        onPress: () => router.push("/notification-settings" as any),
       },
       {
         id: "support",
-        title: t("helpAndSupport"),
-        iconSource: require("../../assets/Icons/Support.png"),
+        title: t("settings.helpSupport"),
+        iconSource: require("../../assets/settings/support (1).png"),
         type: "navigation",
         onPress: () => router.push("/support" as any),
       },
       {
         id: "terms",
         title: t("settings.termsAndPolicies"),
-        iconSource: require("../../assets/Icons/Policy.png"),
+        iconSource: require("../../assets/settings/terms-and-conditions.png"),
         type: "navigation",
-        onPress: () => console.log("Navigate to Terms"),
+        onPress: () => router.push("/terms-policies" as any),
       },
-      // Keep language button integrated
       {
         id: "language",
         title: t("settings.language"),
-        iconSource: require("../../assets/Icons/Vector.png"),
+        iconSource: require("../../assets/settings/internet.png"),
         type: "language",
         value:
           currentLanguage === "en"
             ? "English"
             : currentLanguage === "fr"
-            ? "Français"
-            : "العربية",
+              ? "Français"
+              : "العربية",
       },
       {
         id: "switch_account",
         title: t("settings.switchAccount"),
         iconSource: require("../../assets/Icons/Switch_Account.png"),
         type: "navigation",
-        onPress: () => setShowAccountModal(true),
+        onPress: () => accountBottomSheetRef.current?.present(),
       },
       {
         id: "logout",
@@ -151,8 +179,7 @@ export default function SettingsScreen() {
         onPress: handleLogout,
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, currentLanguage, handleLogout, locale]
+    [t, currentLanguage, handleLogout, router, isSeller, activeView], // Removed locale from dependencies
   );
 
   const renderSettingItem = (item: any) => {
@@ -178,11 +205,19 @@ export default function SettingsScreen() {
               item.type === "logout" && styles.logoutIconCircle,
             ]}
           >
-            <Image
-              source={item.iconSource}
-              style={styles.settingIconImage}
-              resizeMode="contain"
-            />
+            {item.iconName ? (
+              <Ionicons
+                name={item.iconName}
+                size={22}
+                color={item.type === "logout" ? "#FF4444" : "#666"}
+              />
+            ) : (
+              <Image
+                source={item.iconSource}
+                style={styles.settingIconImage}
+                resizeMode="contain"
+              />
+            )}
           </View>
           <Text
             style={[
@@ -217,13 +252,17 @@ export default function SettingsScreen() {
 
   return (
     <ScreenWrapper>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Profile Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileAvatar}>
-            {(user as any)?.avatar ? (
+            {user?.avatar || user?.profileImage ? (
               <Image
-                source={{ uri: (user as any).avatar }}
+                source={{ uri: user?.avatar || user?.profileImage }}
                 style={styles.avatarImage}
               />
             ) : (
@@ -235,7 +274,9 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
-              {user?.email || t("settings.user")}
+              {user?.firstName && user?.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : (user as any)?.name || user?.email || t("settings.user")}
             </Text>
             <Text style={styles.profileEmail}>
               {t("settings.premiumMember")}
@@ -255,11 +296,6 @@ export default function SettingsScreen() {
         {/* Settings Options */}
         <View style={styles.settingsSection}>
           {settingsOptions.map(renderSettingItem)}
-        </View>
-
-        {/* App Version */}
-        <View style={styles.versionSection}>
-          <Text style={styles.versionText}>{t("settings.version")} 1.0.0</Text>
         </View>
 
         {/* Language Selection Modal */}
@@ -300,9 +336,11 @@ export default function SettingsScreen() {
                         styles.selectedLanguageItem,
                     ]}
                     onPress={async () => {
-                      const success = await changeLanguage(item.code);
-                      if (success) {
+                      try {
+                        await changeLanguage(item.code);
                         setShowLanguageModal(false);
+                      } catch (error) {
+                        console.error('Error changing language:', error);
                       }
                     }}
                   >
@@ -322,76 +360,52 @@ export default function SettingsScreen() {
           </BlurView>
         </Modal>
 
-        {/* Switch Account Bottom Sheet Modal */}
-        <Modal
-          visible={showAccountModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowAccountModal(false)}
+        {/* Switch Account Bottom Sheet */}
+        <BottomSheet
+          ref={accountBottomSheetRef}
+          title={t("settings.switchAccountTitle")}
+          snapPoints={["55%"]}
         >
-          <BlurView intensity={2} style={styles.accountModalOverlay}>
-            <TouchableOpacity
-              style={styles.accountModalBackdrop}
-              activeOpacity={1}
-              onPress={() => setShowAccountModal(false)}
-            />
-            <View style={styles.accountBottomSheet}>
-              {/* Header */}
-              <View style={styles.accountSheetHeader}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 20 }}>
+            {savedAccounts.map((account) => (
+              <TouchableOpacity
+                key={account.id}
+                style={styles.accountItem}
+                onPress={() => {
+                  console.log("Switch to account:", account.email);
+                  accountBottomSheetRef.current?.dismiss();
+                }}
+              >
                 <Image
-                  source={require("../../assets/Icons/account_circle.png")}
-                  style={styles.accountCircleIcon}
+                  source={{ uri: account.avatar }}
+                  style={styles.accountAvatar}
                 />
-                <Text style={styles.accountSheetTitle}>
-                  {t("settings.switchAccountTitle")}
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>{account.name}</Text>
+                  <Text style={styles.accountEmail}>{account.email}</Text>
+                </View>
+                <Text style={styles.accountRole}>
+                  {account.role === "Buyer"
+                    ? t("settings.buyer")
+                    : t("settings.seller")}
                 </Text>
-              </View>
+              </TouchableOpacity>
+            ))}
 
-              {/* Account List */}
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {savedAccounts.map((account) => (
-                  <TouchableOpacity
-                    key={account.id}
-                    style={styles.accountItem}
-                    onPress={() => {
-                      // Handle account switch
-                      console.log("Switch to account:", account.email);
-                      setShowAccountModal(false);
-                    }}
-                  >
-                    <Image
-                      source={{ uri: account.avatar }}
-                      style={styles.accountAvatar}
-                    />
-                    <View style={styles.accountInfo}>
-                      <Text style={styles.accountName}>{account.name}</Text>
-                      <Text style={styles.accountEmail}>{account.email}</Text>
-                    </View>
-                    <Text style={styles.accountRole}>
-                      {account.role === "Buyer"
-                        ? t("settings.buyer")
-                        : t("settings.seller")}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-
-                {/* Add New Account Button */}
-                <TouchableOpacity
-                  style={styles.addAccountButton}
-                  onPress={() => {
-                    setShowAccountModal(false);
-                    // Navigate to sign in/sign up
-                    router.push("/auth/SignIn" as any);
-                  }}
-                >
-                  <Text style={styles.addAccountText}>
-                    {t("settings.addNewAccount")}
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </BlurView>
-        </Modal>
+            {/* Add New Account Button */}
+            <TouchableOpacity
+              style={styles.addAccountButton}
+              onPress={() => {
+                accountBottomSheetRef.current?.dismiss();
+                router.push("/auth/SignIn" as any);
+              }}
+            >
+              <Text style={styles.addAccountText}>
+                {t("settings.addNewAccount")}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </BottomSheet>
       </ScrollView>
     </ScreenWrapper>
   );
@@ -539,7 +553,7 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: "#B0B0B0",
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
   },
   // Language Modal Styles
   modalOverlay: {

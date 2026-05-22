@@ -2,29 +2,29 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const PropertySchema = new Schema({
-  owner: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true 
+  owner: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  title: { 
-    type: String, 
+  title: {
+    type: String,
     required: true,
-    trim: true 
+    trim: true
   },
-  description: { 
-    type: String, 
-    required: true 
+  description: {
+    type: String,
+    required: true
   },
-  type: { 
-    type: String, 
+  type: {
+    type: String,
     required: true,
-    enum: ['apartment', 'house', 'commercial', 'land', 'office'] 
+    enum: ['apartment', 'house', 'villa', 'hotel', 'commercial', 'land', 'office']
   },
-  listingType: { 
-    type: String, 
+  listingType: {
+    type: String,
     required: true,
-    enum: ['sale', 'rent'] 
+    enum: ['sale', 'rent']
   },
   propertyDetails: {
     bedrooms: { type: Number, min: 0 },
@@ -74,21 +74,39 @@ const PropertySchema = new Schema({
   },
   features: [{ type: String }],
   rules: [{ type: String }],
-  status: { 
-    type: String, 
+  status: {
+    type: String,
     enum: ['active', 'inactive', 'sold', 'rented', 'pending'],
     default: 'active'
   },
   views: { type: Number, default: 0 },
-  likes: [{ 
-    type: Schema.Types.ObjectId, 
-    ref: 'User' 
+  likes: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   }],
   isPromoted: { type: Boolean, default: false },
-  promotionExpiry: { type: Date }
-}, { 
-  timestamps: true // Auto-add `createdAt` and `updatedAt`
-});
+  promotionExpiry: { type: Date },
+  boostPlan: { type: String, enum: ['1day', '3day', '7day'] },
+  
+  // Booking system fields
+  cancellationPolicy: {
+    type: String,
+    enum: ['flexible', 'moderate', 'strict', 'custom'],
+    default: 'moderate'
+  },
+  customCancellationPolicy: {
+    type: String,
+    maxlength: 1000
+  },
+  capacity: {
+    type: Number,
+    min: 1,
+    default: 1
+  }
+},
+ {
+    timestamps: true // Auto-add `createdAt` and `updatedAt`
+  });
 
 
 

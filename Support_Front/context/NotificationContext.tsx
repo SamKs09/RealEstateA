@@ -23,14 +23,20 @@ const NotificationContext = createContext<{
 
 export const useNotification = () => useContext(NotificationContext);
 
-export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const addNotification = (n: Notification) => setNotifications((prev) => [n, ...prev]);
-  const markAllRead = () => setNotifications((prev) => prev.map(n => ({ ...n, read: true })));
+  const addNotification = (n: Notification) =>
+    setNotifications((prev) => [n, ...prev]);
+  const markAllRead = () =>
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, markAllRead }}>
+    <NotificationContext.Provider
+      value={{ notifications, addNotification, markAllRead }}
+    >
       {children}
     </NotificationContext.Provider>
   );

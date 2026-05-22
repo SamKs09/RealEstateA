@@ -6,10 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
+  ActivityIndicator,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { t } from "../../services/i18n";
+import { useTranslation } from "../../hooks/useTranslation";
+import { useAuth } from "../../contexts/AuthContext";
+import paymentService from "../../services/paymentService";
 import {
   Colors,
   Spacing,
@@ -21,10 +26,13 @@ import { LinearGradient } from "expo-linear-gradient";
 
 export default function PaymentScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
+  const { user } = useAuth();
 
   const [checkInDate, setCheckInDate] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
   // const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("card");
 
   // Property details from params
@@ -166,20 +174,70 @@ export default function PaymentScreen() {
   //   setSelectedPaymentMethod(methodId);
   // };
 
-  const handlePayNow = () => {
-    // Process payment logic here
-    console.log("Processing payment:", {
-      propertyName,
-      checkInDate,
-      checkOutDate,
-      numberOfNights,
-      total,
-      paymentMethod: "mastercard",
-      driverEnabled,
-    });
+  const handlePayNow = async () => {
+    try {
+      setIsProcessing(true);
 
-    // Navigate to success screen or back to bookings
-    router.push("../(tabs)/Bookings");
+      // Prepare payment data
+      const paymentData = {
+        propertyId: params.propertyId as string || '',
+        propertyName: String(propertyName),
+        amount: total,
+        checkInDate: rawCheckIn || new Date().toISOString(),
+        checkOutDate: rawCheckOut || new Date().toISOString(),
+        numberOfNights,
+        driverEnabled,
+        arrivingTime: String(arrivingTime),
+        leavingTime: String(leavingTime),
+      };
+
+      console.log('🔐 Initiating payment:', paymentData);
+
+      // Call backend to create Konnect checkout
+      const response = await paymentService.initiateBookingPayment(paymentData);
+
+      if (response.success && response.data?.checkoutUrl) {
+        console.log('✅ Payment initiated successfully');
+        console.log('🌐 Opening Konnect payment page...');
+
+        // Open Konnect payment page in browser
+        const checkoutUrl = response.data.checkoutUrl;
+        const canOpen = await Linking.canOpenURL(checkoutUrl);
+
+        if (canOpen) {
+          await Linking.openURL(checkoutUrl);
+
+          // Show info alert
+          Alert.alert(
+            t("payment.redirected") || "Payment",
+            t("payment.completePayment") || "Complete your payment in the browser. You can return to the app after payment is completed.",
+            [
+              {
+                text: t("common.ok") || "OK",
+                onPress: () => {
+                  // After user acknowledges, navigate back to bookings
+                  router.push("../(tabs)/Bookings");
+                },
+              },
+            ]
+          );
+        } else {
+          throw new Error('Cannot open payment URL');
+        }
+      } else {
+        throw new Error(response.message || 'Failed to create payment');
+      }
+    } catch (error: any) {
+      console.error('❌ Payment initiation failed:', error);
+
+      Alert.alert(
+        t("payment.error") || "Payment Error",
+        error.message || t("payment.errorMessage") || "Failed to process payment. Please try again.",
+        [{ text: t("common.ok") || "OK" }]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -200,7 +258,11 @@ export default function PaymentScreen() {
         {/* HERO IMAGE WITH PROPERTY INFO */}
         <View style={styles.heroSection}>
           <Image
-            source={require("../../assets/images/Auth/Appartment.png")}
+            source={
+              params.propertyImage
+                ? { uri: params.propertyImage as string }
+                : require("../../assets/images/Auth/Appartment.png")
+            }
             style={styles.heroImage}
           />
           <View style={styles.heroOverlay}>
@@ -209,11 +271,11 @@ export default function PaymentScreen() {
               <View style={styles.propertyDetails}>
                 <View style={styles.detailItem}>
                   <Ionicons name="bed-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.detailText}>3 Bedroom</Text>
+                  <Text style={styles.detailText}>{params.bedrooms || 0} Bedroom</Text>
                 </View>
                 <View style={styles.detailItem}>
-                  <Ionicons name="car-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.detailText}>1 Bathroom</Text>
+                  <Ionicons name="water-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.detailText}>{params.bathrooms || 0} Bathroom</Text>
                 </View>
               </View>
             </View>
@@ -295,18 +357,33 @@ export default function PaymentScreen() {
 
       {/* Pay Now Button */}
       <View style={styles.bottomSection}>
-        <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
+        <TouchableOpacity 
+          style={[styles.payButton, isProcessing && styles.payButtonDisabled]} 
+          onPress={handlePayNow}
+          disabled={isProcessing}
+        >
           <LinearGradient
-            colors={[Colors.primary, Colors.primaryLight]}
+            colors={isProcessing ? [Colors.borderLight, Colors.borderLight] : [Colors.primary, Colors.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.payButtonGradient}
           >
             <View style={styles.payButtonContent}>
-              <Text style={styles.payButtonTextLabel}>
-                {t("payment.payNow")} |{" "}
-              </Text>
-              <Text style={styles.payButtonTextAmount}>{total}DT</Text>
+              {isProcessing ? (
+                <>
+                  <ActivityIndicator color={Colors.textWhite} size="small" />
+                  <Text style={[styles.payButtonTextLabel, { marginLeft: 8 }]}>
+                    {t("payment.processing") || "Processing..."}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.payButtonTextLabel}>
+                    {t("payment.payNow")} |{" "}
+                  </Text>
+                  <Text style={styles.payButtonTextAmount}>{total}DT</Text>
+                </>
+              )}
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -402,7 +479,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.textWhite,
     fontWeight: Typography.fontWeight.medium,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
   // Overview Section Styles
   overviewSection: {
@@ -431,7 +508,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-600SemiBold",
     marginBottom: 2,
   },
   dateLabel: {
@@ -446,7 +523,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.normal,
     color: Colors.textSecondary,
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
   },
   // Payment Section Styles
   paymentSection: {
@@ -494,7 +571,7 @@ const styles = StyleSheet.create({
   cardDetails: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
     marginTop: 5,
   },
   // Breakdown styles
@@ -519,7 +596,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.textPrimary,
     fontWeight: Typography.fontWeight.semibold,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-600SemiBold",
   },
   totalRow: {
     flexDirection: "row",
@@ -540,7 +617,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     color: Colors.textPrimary,
     fontWeight: Typography.fontWeight.bold,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
   },
   payButton: {
     borderRadius: BorderRadius["3xl"],
@@ -573,6 +650,9 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.textWhite,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-700Bold",
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
   },
 });

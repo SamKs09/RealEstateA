@@ -16,12 +16,12 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { BackButton } from "../../components/Ui";
 import { apiService } from "../../services/api";
 
 export default function CreateTicketScreen() {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);

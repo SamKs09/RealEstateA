@@ -3,21 +3,21 @@ const Schema = mongoose.Schema;
 
 const vehicleSchema = new Schema({
   owner: { type: Schema.Types.ObjectId, ref: 'User', required: [true, 'Owner is required'] },
-  title: { 
-    type: String, 
+  title: {
+    type: String,
     required: [true, 'Title is required'],
     trim: true,
     minlength: [3, 'Title must be at least 3 characters long'],
     maxlength: [200, 'Title cannot exceed 200 characters']
   },
-  description: { 
-    type: String, 
+  description: {
+    type: String,
     required: [true, 'Description is required'],
     trim: true,
     minlength: [10, 'Description must be at least 10 characters long']
   },
-  type: { 
-    type: String, 
+  type: {
+    type: String,
     required: [true, 'Vehicle type is required'],
     enum: {
       values: ['car', 'motorcycle', 'truck', 'van', 'bus'],
@@ -33,24 +33,24 @@ const vehicleSchema = new Schema({
     }
   },
   vehicleDetails: {
-    make: { 
-      type: String, 
+    make: {
+      type: String,
       required: [true, 'Vehicle make is required'],
       trim: true
     },
-    model: { 
-      type: String, 
+    model: {
+      type: String,
       required: [true, 'Vehicle model is required'],
       trim: true
     },
-    year: { 
-      type: Number, 
+    year: {
+      type: Number,
       required: [true, 'Vehicle year is required'],
       min: [1900, 'Year cannot be before 1900'],
       max: [new Date().getFullYear() + 1, 'Year cannot be in the future']
     },
     color: { type: String, trim: true },
-    mileage: { 
+    mileage: {
       type: Number,
       min: [0, 'Mileage cannot be negative']
     },
@@ -75,11 +75,11 @@ const vehicleSchema = new Schema({
         message: '{VALUE} is not a valid condition'
       }
     },
-    engineCapacity: { 
+    engineCapacity: {
       type: Number,
       min: [0, 'Engine capacity cannot be negative']
     },
-    seatingCapacity: { 
+    seatingCapacity: {
       type: Number,
       min: [1, 'Seating capacity must be at least 1'],
       max: [100, 'Seating capacity cannot exceed 100']
@@ -89,25 +89,25 @@ const vehicleSchema = new Schema({
     features: [String]
   },
   location: {
-    city: { 
-      type: String, 
+    city: {
+      type: String,
       required: [true, 'City is required'],
       trim: true
     },
     state: { type: String, trim: true },
-    country: { 
-      type: String, 
+    country: {
+      type: String,
       required: [true, 'Country is required'],
       trim: true
     },
     address: { type: String, trim: true },
     coordinates: {
-      latitude: { 
+      latitude: {
         type: Number,
         min: [-90, 'Latitude must be between -90 and 90'],
         max: [90, 'Latitude must be between -90 and 90']
       },
-      longitude: { 
+      longitude: {
         type: Number,
         min: [-180, 'Longitude must be between -180 and 180'],
         max: [180, 'Longitude must be between -180 and 180']
@@ -115,11 +115,11 @@ const vehicleSchema = new Schema({
     }
   },
   pricing: {
-    salePrice: { 
+    salePrice: {
       type: Number,
       min: [0, 'Sale price cannot be negative']
     },
-    rentPrice: { 
+    rentPrice: {
       type: Number,
       min: [0, 'Rent price cannot be negative']
     },
@@ -136,7 +136,7 @@ const vehicleSchema = new Schema({
       trim: true,
       uppercase: true
     },
-    deposit: { 
+    deposit: {
       type: Number,
       min: [0, 'Deposit cannot be negative']
     },
@@ -165,7 +165,19 @@ const vehicleSchema = new Schema({
   views: { type: Number, default: 0 },
   likes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   isPromoted: { type: Boolean, default: false },
-  promotionExpiry: Date
+  promotionExpiry: Date,
+  boostPlan: { type: String, enum: ['1day', '3day', '7day'] },
+  
+  // Booking system fields
+  cancellationPolicy: {
+    type: String,
+    enum: ['flexible', 'moderate', 'strict', 'custom'],
+    default: 'moderate'
+  },
+  customCancellationPolicy: {
+    type: String,
+    maxlength: 1000
+  }
 }, { timestamps: true });
 
 // Indexes for better query performance

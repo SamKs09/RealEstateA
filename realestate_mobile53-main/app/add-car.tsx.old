@@ -1,0 +1,913 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import { Image } from "expo-image";
+import { useLanguage } from "../contexts/LanguageContext";
+import { BackButton, SuccessModal, MapPicker } from "../components/Ui";
+import { vehicleService } from "../services";
+import i18n from "../services/i18n";
+
+export default function AddCarScreen() {
+  const router = useRouter();
+  const { t } = useLanguage();
+  const [locale, setLocale] = useState(i18n.locale);
+
+  // Listen for language changes - same pattern as _layout.tsx
+  React.useEffect(() => {
+    const checkLocale = setInterval(() => {
+      if (i18n.locale !== locale) {
+        setLocale(i18n.locale);
+      }
+    }, 100);
+
+    return () => clearInterval(checkLocale);
+  }, [locale]);
+
+  const [selectedImages, setSelectedImages] = useState<
+    ImagePicker.ImagePickerAsset[]
+  >([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    // Required fields
+    title: "",
+    description: "",
+    type: "car",
+    listingType: "sale",
+    make: "",
+    model: "",
+    year: new Date().getFullYear().toString(),
+    city: "",
+    country: "",
+
+    // Optional vehicle details
+    color: "",
+    mileage: "",
+    fuelType: "petrol",
+    transmission: "automatic",
+    condition: "used",
+
+    // Pricing
+    salePrice: "",
+    rentPrice: "",
+    rentPeriod: "daily",
+
+    // Location coordinates (auto-filled)
+    latitude: 0,
+    longitude: 0,
+  });
+
+  // Get user's current location on mount
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setFormData((prev) => ({
+          ...prev,
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        }));
+      }
+    } catch (error) {
+      console.log("Location permission not granted or error:", error);
+    }
+  };
+
+  const updateFormData = (key: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const pickImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== "granted") {
+      Alert.alert(t("permissionRequired"), t("photoLibraryPermission"));
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+      selectionLimit: 10,
+    });
+
+    if (!result.canceled) {
+      setSelectedImages((prev) => [...prev, ...result.assets]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLocationSelect = (location: {
+    latitude: number;
+    longitude: number;
+  }) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }));
+    setShowMapPicker(false);
+  };
+
+  const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.title.trim()) {
+      Alert.alert(t("addCar.error"), t("addCar.enterVehicleTitle"));
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      Alert.alert(t("addCar.error"), t("addCar.enterDescription"));
+      return;
+    }
+
+    if (!formData.make.trim()) {
+      Alert.alert(t("addCar.error"), t("addCar.enterVehicleMake"));
+      return;
+    }
+
+    if (!formData.model.trim()) {
+      Alert.alert(t("addCar.error"), t("addCar.enterVehicleModel"));
+      return;
+    }
+
+    if (!formData.city.trim() || !formData.country.trim()) {
+      Alert.alert(t("addCar.error"), t("addCar.enterCityCountry"));
+      return;
+    }
+
+    // Validate pricing based on listing type
+    if (formData.listingType === "sale") {
+      if (!formData.salePrice || parseFloat(formData.salePrice) <= 0) {
+        Alert.alert(t("addCar.error"), t("addCar.enterValidSalePrice"));
+        return;
+      }
+    } else {
+      if (!formData.rentPrice || parseFloat(formData.rentPrice) <= 0) {
+        Alert.alert(t("addCar.error"), t("addCar.enterValidRentPrice"));
+        return;
+      }
+    }
+
+    if (selectedImages.length === 0) {
+      Alert.alert(t("addCar.error"), t("addCar.addAtLeastOneImage"));
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Prepare vehicle data
+      const vehicleData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        type: formData.type as "car" | "motorcycle" | "truck" | "van" | "bus",
+        listingType: formData.listingType as "sale" | "rent",
+        vehicleDetails: {
+          make: formData.make.trim(),
+          model: formData.model.trim(),
+          year: parseInt(formData.year),
+          ...(formData.color && { color: formData.color }),
+          ...(formData.mileage && { mileage: parseInt(formData.mileage) }),
+          fuelType: formData.fuelType as
+            | "petrol"
+            | "diesel"
+            | "electric"
+            | "hybrid",
+          transmission: formData.transmission as "manual" | "automatic",
+          condition: formData.condition as "new" | "used" | "certified",
+        },
+        location: {
+          city: formData.city.trim(),
+          country: formData.country.trim(),
+          ...(formData.latitude &&
+            formData.longitude && {
+              coordinates: {
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+              },
+            }),
+        },
+        pricing:
+          formData.listingType === "sale"
+            ? {
+                salePrice: parseFloat(formData.salePrice),
+                currency: "USD",
+              }
+            : {
+                rentPrice: parseFloat(formData.rentPrice),
+                rentPeriod: formData.rentPeriod as
+                  | "daily"
+                  | "weekly"
+                  | "monthly",
+                currency: "USD",
+              },
+      };
+
+      console.log("Submitting vehicle data:", vehicleData);
+
+      // Create vehicle
+      const response = await vehicleService.createVehicle(vehicleData);
+
+      console.log("Vehicle created:", response);
+
+      // Upload images if vehicle was created
+      if (response.success && response.data._id) {
+        const images = selectedImages.map((image, index) => ({
+          uri: image.uri,
+          name: `vehicle_${Date.now()}_${index}.jpg`,
+          type: "image/jpeg",
+        }));
+
+        await vehicleService.uploadVehicleImages(response.data._id, images);
+      }
+
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error("Error creating vehicle:", error);
+      const errorMessage =
+        error?.message || error?.errors?.[0] || t("addCar.failedToCreate");
+      Alert.alert(t("addCar.error"), errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <BackButton onPress={() => router.back()} color="#A0A09E" />
+        </View>
+        <Text style={styles.headerTitle}>{t("addCar.addNewVehicle")}</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Title */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.vehicleTitle")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.vehicleTitlePlaceholder")}
+            value={formData.title}
+            onChangeText={(text) => updateFormData("title", text)}
+          />
+        </View>
+
+        {/* Type */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.vehicleType")} *</Text>
+          <View style={styles.selectContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.selectOptions}
+            >
+              {["car", "motorcycle", "truck", "van", "bus"].map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.selectOption,
+                    formData.type === type && styles.selectOptionActive,
+                  ]}
+                  onPress={() => updateFormData("type", type)}
+                >
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      formData.type === type && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    {t(`addCar.${type}`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Listing Type */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.listingType")} *</Text>
+          <View style={styles.selectContainer}>
+            <View style={styles.selectOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.selectOption,
+                  formData.listingType === "sale" && styles.selectOptionActive,
+                ]}
+                onPress={() => updateFormData("listingType", "sale")}
+              >
+                <Text
+                  style={[
+                    styles.selectOptionText,
+                    formData.listingType === "sale" &&
+                      styles.selectOptionTextActive,
+                  ]}
+                >
+                  {t("addCar.forSale")}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.selectOption,
+                  formData.listingType === "rent" && styles.selectOptionActive,
+                ]}
+                onPress={() => updateFormData("listingType", "rent")}
+              >
+                <Text
+                  style={[
+                    styles.selectOptionText,
+                    formData.listingType === "rent" &&
+                      styles.selectOptionTextActive,
+                  ]}
+                >
+                  {t("addCar.forRent")}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Make */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.make")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.makePlaceholder")}
+            value={formData.make}
+            onChangeText={(text) => updateFormData("make", text)}
+          />
+        </View>
+
+        {/* Model */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.model")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.modelPlaceholder")}
+            value={formData.model}
+            onChangeText={(text) => updateFormData("model", text)}
+          />
+        </View>
+
+        {/* Year */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.year")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.yearPlaceholder")}
+            value={formData.year}
+            onChangeText={(text) => updateFormData("year", text)}
+            keyboardType="numeric"
+          />
+        </View>
+
+        {/* Color */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>
+            {t("addCar.color")} ({t("addCar.optional")})
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.colorPlaceholder")}
+            value={formData.color}
+            onChangeText={(text) => updateFormData("color", text)}
+          />
+        </View>
+
+        {/* Mileage */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>
+            {t("addCar.mileage")} ({t("addCar.optional")})
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.mileagePlaceholder")}
+            value={formData.mileage}
+            onChangeText={(text) => updateFormData("mileage", text)}
+            keyboardType="numeric"
+          />
+        </View>
+
+        {/* Fuel Type */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.fuelType")}</Text>
+          <View style={styles.buttonRow}>
+            {[
+              { label: t("addCar.petrol"), value: "petrol" },
+              { label: t("addCar.diesel"), value: "diesel" },
+              { label: t("addCar.electric"), value: "electric" },
+              { label: t("addCar.hybrid"), value: "hybrid" },
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  formData.fuelType === option.value &&
+                    styles.optionButtonActive,
+                ]}
+                onPress={() => updateFormData("fuelType", option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    formData.fuelType === option.value &&
+                      styles.optionButtonTextActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Transmission */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.transmission")}</Text>
+          <View style={styles.buttonRow}>
+            {[
+              { label: t("addCar.automatic"), value: "automatic" },
+              { label: t("addCar.manual"), value: "manual" },
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  formData.transmission === option.value &&
+                    styles.optionButtonActive,
+                ]}
+                onPress={() => updateFormData("transmission", option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    formData.transmission === option.value &&
+                      styles.optionButtonTextActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Condition */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.condition")}</Text>
+          <View style={styles.buttonRow}>
+            {[
+              { label: t("addCar.new"), value: "new" },
+              { label: t("addCar.used"), value: "used" },
+              { label: t("addCar.certified"), value: "certified" },
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  formData.condition === option.value &&
+                    styles.optionButtonActive,
+                ]}
+                onPress={() => updateFormData("condition", option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionButtonText,
+                    formData.condition === option.value &&
+                      styles.optionButtonTextActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Pricing - Conditional based on listing type */}
+        {formData.listingType === "sale" ? (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>{t("addCar.salePrice")} (USD) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t("addCar.salePricePlaceholder")}
+              value={formData.salePrice}
+              onChangeText={(text) => updateFormData("salePrice", text)}
+              keyboardType="numeric"
+            />
+          </View>
+        ) : (
+          <>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>{t("addCar.rentPrice")} (USD) *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t("addCar.rentPricePlaceholder")}
+                value={formData.rentPrice}
+                onChangeText={(text) => updateFormData("rentPrice", text)}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>{t("addCar.rentPeriod")}</Text>
+              <View style={styles.buttonRow}>
+                {[
+                  { label: t("addCar.daily"), value: "daily" },
+                  { label: t("addCar.weekly"), value: "weekly" },
+                  { label: t("addCar.monthly"), value: "monthly" },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.optionButton,
+                      formData.rentPeriod === option.value &&
+                        styles.optionButtonActive,
+                    ]}
+                    onPress={() => updateFormData("rentPeriod", option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.optionButtonText,
+                        formData.rentPeriod === option.value &&
+                          styles.optionButtonTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* City */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.city")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.cityPlaceholder")}
+            value={formData.city}
+            onChangeText={(text) => updateFormData("city", text)}
+          />
+        </View>
+
+        {/* Country */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.country")} *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={t("addCar.countryPlaceholder")}
+            value={formData.country}
+            onChangeText={(text) => updateFormData("country", text)}
+          />
+        </View>
+
+        {/* Location Picker */}
+        <TouchableOpacity
+          style={styles.locationButton}
+          onPress={() => setShowMapPicker(true)}
+        >
+          <Ionicons name="location-outline" size={24} color="#FF6B35" />
+          <Text style={styles.locationButtonText}>
+            {formData.latitude && formData.longitude
+              ? t("addCar.locationSelected")
+              : t("addCar.selectLocationOnMap")}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Description */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{t("addCar.description")} *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder={t("addCar.descriptionPlaceholder")}
+            value={formData.description}
+            onChangeText={(text) => updateFormData("description", text)}
+            multiline
+            numberOfLines={6}
+          />
+        </View>
+
+        {/* Upload image button */}
+        <TouchableOpacity style={styles.uploadButton} onPress={pickImages}>
+          <Ionicons name="add" size={32} color="#FF6B35" />
+          <Text style={styles.uploadText}>{t("addCar.uploadImages")} *</Text>
+          {selectedImages.length > 0 && (
+            <Text style={styles.imageCount}>
+              {selectedImages.length} {t("addCar.imagesSelected")}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Display selected images */}
+        {selectedImages.length > 0 && (
+          <View style={styles.imageGrid}>
+            {selectedImages.map((image, index) => (
+              <View key={index} style={styles.imageContainer}>
+                <Image source={{ uri: image.uri }} style={styles.image} />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={() => removeImage(index)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Add Item button */}
+        <TouchableOpacity
+          style={[styles.addButton, loading && styles.addButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.addButtonText}>
+              {t("addCar.createListing")}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Map Picker Modal */}
+      <MapPicker
+        visible={showMapPicker}
+        onClose={() => setShowMapPicker(false)}
+        onLocationSelect={handleLocationSelect}
+        initialLocation={
+          formData.latitude && formData.longitude
+            ? {
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+              }
+            : undefined
+        }
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={showSuccessModal}
+        title={t("addCar.success")}
+        message={t("addCar.vehicleCreatedSuccessfully")}
+        buttonText={t("addCar.viewListings")}
+        onClose={() => {
+          setShowSuccessModal(false);
+          router.back();
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  headerTop: {
+    marginBottom: 16,
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  headerTitle: {
+    textAlign: "center",
+    fontSize: 24,
+    fontFamily: "Raleway-Bold",
+    color: "#FF6B35",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  inputContainer: {
+    marginTop: 24,
+    position: "relative",
+  },
+  label: {
+    position: "absolute",
+    top: -10,
+    left: 20,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    fontSize: 14,
+    fontFamily: "Raleway-SemiBold",
+    color: "#FF6B35",
+    zIndex: 1,
+  },
+  input: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    fontSize: 14,
+    fontFamily: "Raleway",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    color: "#333333",
+  },
+  pickerContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    overflow: "hidden",
+  },
+  picker: {
+    color: "#333333",
+    fontFamily: "Raleway",
+  },
+  textArea: {
+    height: 150,
+    textAlignVertical: "top",
+    paddingTop: 14,
+  },
+  locationButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginTop: 24,
+  },
+  locationButtonText: {
+    fontSize: 16,
+    fontFamily: "Raleway-SemiBold",
+    color: "#FF6B35",
+    marginLeft: 8,
+  },
+  uploadButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    paddingVertical: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginTop: 24,
+  },
+  uploadText: {
+    fontSize: 16,
+    fontFamily: "Raleway-SemiBold",
+    color: "#FF6B35",
+    marginTop: 8,
+  },
+  addButton: {
+    backgroundColor: "#FF6B35",
+    borderRadius: 25,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 40,
+  },
+  addButtonDisabled: {
+    opacity: 0.6,
+  },
+  addButtonText: {
+    fontSize: 18,
+    fontFamily: "Raleway-Bold",
+    color: "#FFFFFF",
+  },
+  imageCount: {
+    fontSize: 14,
+    fontFamily: "Raleway",
+    color: "#666666",
+    marginTop: 8,
+  },
+  imageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 20,
+  },
+  imageContainer: {
+    width: "31%",
+    aspectRatio: 1,
+    position: "relative",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "white",
+    borderRadius: 12,
+  },
+  // Custom select styles for horizontal scrollable options
+  selectContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    paddingVertical: 10,
+  },
+  selectOptions: {
+    flexDirection: "row",
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  selectOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  selectOptionActive: {
+    backgroundColor: "#FF6B35",
+    borderColor: "#FF6B35",
+  },
+  selectOptionText: {
+    fontSize: 14,
+    fontFamily: "Raleway-SemiBold",
+    color: "#666666",
+  },
+  selectOptionTextActive: {
+    color: "#FFFFFF",
+  },
+  // Button row for options like fuel type, transmission, etc.
+  buttonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: 10,
+  },
+  optionButton: {
+    flex: 1,
+    minWidth: "30%",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  optionButtonActive: {
+    backgroundColor: "#FF6B35",
+    borderColor: "#FF6B35",
+  },
+  optionButtonText: {
+    fontSize: 14,
+    fontFamily: "Raleway-SemiBold",
+    color: "#666666",
+  },
+  optionButtonTextActive: {
+    color: "#FFFFFF",
+  },
+});

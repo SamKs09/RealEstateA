@@ -129,13 +129,20 @@ export default function ChatWindow() {
     const userParticipant = selectedThread.participants?.find(
       (p: any) => p.role === "user"
     );
-    const userData: any = typeof userParticipant?.userId === "object"
-      ? userParticipant.userId
-      : null;
-    
+    const userData: any =
+      typeof userParticipant?.userId === "object"
+        ? userParticipant.userId
+        : null;
+
     // Build fullName if not present but firstName/lastName exist
-    if (userData && !userData.fullName && (userData.firstName || userData.lastName)) {
-      userData.fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+    if (
+      userData &&
+      !userData.fullName &&
+      (userData.firstName || userData.lastName)
+    ) {
+      userData.fullName = `${userData.firstName || ""} ${
+        userData.lastName || ""
+      }`.trim();
     }
     return userData;
   };
@@ -155,7 +162,7 @@ export default function ChatWindow() {
   }
 
   const user = getUser();
-  console.log('ChatWindow user:', user);
+  console.log("ChatWindow user:", user);
 
   if (loading) {
     return (
@@ -176,7 +183,7 @@ export default function ChatWindow() {
           <div>
             <h3 className="font-semibold text-gray-900">
               {user?.firstName || user?.lastName
-                ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+                ? `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
                 : user?.fullName || "Unknown User"}
             </h3>
             <p className="text-sm text-gray-500">{user?.email || ""}</p>
@@ -218,21 +225,24 @@ export default function ChatWindow() {
             // Determine if message is from support/admin based on sender's role
             // Support dashboard: Support messages on RIGHT, Customer messages on LEFT
             const senderRole = message.sender?.role;
-            
+
             // Check if sender is support or admin by role
-            const isFromSupport = senderRole === "support" || senderRole === "admin";
-            
+            const isFromSupport =
+              senderRole === "support" || senderRole === "admin";
+
             // If role is "user", it's definitely from customer (LEFT side)
             // If role is "support" or "admin", it's from support (RIGHT side)
             // This is the support dashboard, so support = right, customer = left
             const alignRight = isFromSupport;
-            
+
             const senderName =
               typeof message.sender?.userId === "object"
                 ? `${message.sender.userId.firstName || ""} ${
                     message.sender.userId.lastName || ""
                   }`.trim()
-                : senderRole === "user" ? (user?.fullName || "Customer") : "Support";
+                : senderRole === "user"
+                ? user?.fullName || "Customer"
+                : "Support";
 
             return (
               <div
@@ -242,7 +252,9 @@ export default function ChatWindow() {
                 }`}
               >
                 <div
-                  className={`max-w-[70%] ${alignRight ? "order-2" : "order-1"}`}
+                  className={`max-w-[70%] ${
+                    alignRight ? "order-2" : "order-1"
+                  }`}
                 >
                   {!alignRight && (
                     <div className="text-xs text-gray-500 mb-1 ml-1">

@@ -5,6 +5,7 @@ A modern, real-time support and admin dashboard for managing customer conversati
 ## 🎯 Features
 
 ### Core Features
+
 - ✅ **Real-time Messaging** - Socket.io integration for instant message delivery
 - ✅ **Thread Management** - View, filter, and search conversations
 - ✅ **Status Management** - Close and manage thread status
@@ -16,6 +17,7 @@ A modern, real-time support and admin dashboard for managing customer conversati
 - ✅ **Responsive Design** - Works on desktop and tablet
 
 ### User Interface
+
 - Modern, clean design with Tailwind CSS
 - Dark/light message bubbles
 - Conversation list with unread badges
@@ -26,33 +28,38 @@ A modern, real-time support and admin dashboard for managing customer conversati
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js 18+ installed
-- Backend server running on `http://192.168.100.4:3000`
+- Backend server running on `http://172.20.10.6:3000`
 - Support or Admin user account
 
 ### Installation
 
 1. **Navigate to the Support_Front directory:**
+
    ```bash
    cd Support_Front
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 3. **Configure environment variables:**
-   
+
    The `.env.local` file is already created with default values:
+
    ```env
-   NEXT_PUBLIC_API_URL=http://192.168.100.4:3000
-   NEXT_PUBLIC_SOCKET_URL=http://192.168.100.4:3000
+   NEXT_PUBLIC_API_URL=http://172.20.10.6:3000
+   NEXT_PUBLIC_SOCKET_URL=http://172.20.10.6:3000
    ```
 
    If your backend is running on a different address, update these values.
 
 4. **Start the development server:**
+
    ```bash
    npm run dev
    ```
@@ -65,6 +72,7 @@ A modern, real-time support and admin dashboard for managing customer conversati
 ## 🔐 Login
 
 ### Credentials
+
 You need a support or admin account to access the dashboard.
 
 1. **Login at:** `http://localhost:3000/login`
@@ -78,7 +86,7 @@ You need a support or admin account to access the dashboard.
 You can create a support account through the backend API:
 
 ```bash
-POST http://192.168.100.4:3000/api/auth/signup
+POST http://172.20.10.6:3000/api/auth/signup
 Content-Type: application/json
 
 {
@@ -90,11 +98,12 @@ Content-Type: application/json
 ```
 
 Or update an existing user's role directly in MongoDB:
+
 ```javascript
 db.users.updateOne(
   { email: "support@example.com" },
-  { $set: { role: ["support"] } }
-)
+  { $set: { role: ["support"] } },
+);
 ```
 
 ## 📱 Using the Dashboard
@@ -104,11 +113,13 @@ db.users.updateOne(
 The dashboard is divided into three main sections:
 
 #### 1. Header (Top)
+
 - User profile with name and role
 - Statistics button
 - Logout button
 
 #### 2. Thread List (Left Sidebar)
+
 - **Search Bar** - Search conversations by user name or message content
 - **Filters:**
   - All - Show all threads
@@ -125,6 +136,7 @@ The dashboard is divided into three main sections:
   - Status badge
 
 #### 3. Chat Window (Main Area)
+
 - **Header:**
   - User information
   - Online/offline status
@@ -146,18 +158,21 @@ The dashboard is divided into three main sections:
 ### Features Guide
 
 #### Sending Messages
+
 1. Select a thread from the list
 2. Type your message in the input box
 3. Press Enter or click Send
 4. Or click the image icon to send an image
 
 #### Closing Threads
+
 1. Open the conversation
 2. Click "Close Thread" button in the header
 3. Confirm the action
 4. Thread status will update to "closed"
 
 #### Viewing Statistics
+
 1. Click the "Statistics" button in the header
 2. View metrics:
    - Active threads
@@ -169,12 +184,14 @@ The dashboard is divided into three main sections:
 4. Click X to return to conversations
 
 #### Filtering Conversations
+
 - **All** - Shows all threads regardless of status
 - **Active** - Only shows ongoing conversations
 - **Closed** - Only shows resolved threads
 - **Unassigned** - Shows threads that need assignment
 
 #### Searching
+
 - Type in the search box to filter by:
   - User name
   - Message content
@@ -183,6 +200,7 @@ The dashboard is divided into three main sections:
 ## 🔧 Technical Details
 
 ### Tech Stack
+
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
@@ -193,6 +211,7 @@ The dashboard is divided into three main sections:
 - **Icons:** React Icons
 
 ### Project Structure
+
 ```
 Support_Front/
 ├── app/
@@ -225,6 +244,7 @@ Support_Front/
 The dashboard connects to these backend endpoints:
 
 **Thread APIs:**
+
 - `GET /api/messages/threads` - List threads
 - `GET /api/messages/threads/:id` - Get thread details
 - `PATCH /api/messages/threads/:id/status` - Update status
@@ -232,6 +252,7 @@ The dashboard connects to these backend endpoints:
 - `POST /api/messages/threads/:id/assign` - Assign agent
 
 **Message APIs:**
+
 - `GET /api/messages/threads/:id/messages` - Get messages
 - `POST /api/messages/threads/:id/messages` - Send message
 - `POST /api/messages/threads/:id/messages/image` - Send image
@@ -239,6 +260,7 @@ The dashboard connects to these backend endpoints:
 - `DELETE /api/messages/:id` - Delete message
 
 **Support APIs:**
+
 - `GET /api/messages/support/stats` - Get statistics
 - `GET /api/messages/unread/count` - Get unread count
 - `GET /api/messages/search` - Search messages
@@ -246,6 +268,7 @@ The dashboard connects to these backend endpoints:
 ### Socket.io Events
 
 **Client Emits:**
+
 - `thread:join` - Join thread room
 - `thread:leave` - Leave thread room
 - `message:send` - Send message
@@ -254,6 +277,7 @@ The dashboard connects to these backend endpoints:
 - `message:read` - Mark as read
 
 **Server Emits:**
+
 - `message:new` - New message received
 - `message:edited` - Message was edited
 - `message:deleted` - Message was deleted
@@ -269,6 +293,7 @@ The dashboard connects to these backend endpoints:
 ### Changing Colors
 
 Edit `tailwind.config.js`:
+
 ```javascript
 theme: {
   extend: {
@@ -284,6 +309,7 @@ theme: {
 ### Changing Backend URL
 
 Edit `.env.local`:
+
 ```env
 NEXT_PUBLIC_API_URL=http://your-backend-url:3000
 NEXT_PUBLIC_SOCKET_URL=http://your-backend-url:3000
@@ -292,28 +318,35 @@ NEXT_PUBLIC_SOCKET_URL=http://your-backend-url:3000
 ## 🐛 Troubleshooting
 
 ### Login Issues
+
 **Problem:** "Access denied. You need support or admin privileges."
 **Solution:** Ensure your user account has `role: ["support"]` or `role: ["admin"]` in the database.
 
 ### Connection Issues
+
 **Problem:** Cannot connect to backend
-**Solution:** 
+**Solution:**
+
 1. Check if backend server is running
 2. Verify the API_URL in `.env.local`
 3. Check network connectivity
 4. Check CORS settings on backend
 
 ### Socket.io Not Connecting
+
 **Problem:** Real-time features not working
 **Solution:**
+
 1. Check if Socket.io is initialized on backend
 2. Verify JWT token is valid
 3. Check browser console for errors
 4. Ensure firewall allows WebSocket connections
 
 ### Images Not Loading
+
 **Problem:** Images show broken icon
 **Solution:**
+
 1. Check if backend serves static files from `/uploads`
 2. Verify image URL in message
 3. Check image file permissions on server
@@ -321,13 +354,15 @@ NEXT_PUBLIC_SOCKET_URL=http://your-backend-url:3000
 ## 📊 Performance Tips
 
 1. **Limit Thread Load:** The default limit is 50 threads. Adjust in `ThreadList.tsx`:
+
    ```typescript
-   const response = await apiService.getThreads({ limit: 50 })
+   const response = await apiService.getThreads({ limit: 50 });
    ```
 
 2. **Message Pagination:** Messages are loaded 100 at a time. Increase for longer conversations:
+
    ```typescript
-   const response = await apiService.getMessages(threadId, { limit: 100 })
+   const response = await apiService.getMessages(threadId, { limit: 100 });
    ```
 
 3. **Optimize Renders:** The app uses Zustand for efficient state management. Avoid unnecessary re-renders.
@@ -351,6 +386,7 @@ npm run start
 ### Deploy to Other Platforms
 
 The app is a standard Next.js application and can be deployed to:
+
 - Vercel
 - Netlify
 - AWS Amplify
@@ -368,6 +404,7 @@ The app is a standard Next.js application and can be deployed to:
 ## 📝 Future Enhancements
 
 Potential features to add:
+
 - [ ] Thread assignment to specific agents
 - [ ] Bulk actions (close multiple threads)
 - [ ] Keyboard shortcuts
@@ -388,6 +425,7 @@ This project is part of the Real Estate Platform.
 ## 🆘 Support
 
 For issues or questions:
+
 1. Check the troubleshooting section
 2. Review backend logs
 3. Check browser console for errors

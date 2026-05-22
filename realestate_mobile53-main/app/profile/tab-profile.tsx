@@ -4,18 +4,28 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ScrollView,
 } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../../contexts/AuthContext";
+import { useInterest } from "../../contexts/InterestContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshProfile } = useAuth();
+  const { activeView, isBothMode, userInterest } = useInterest();
   const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Refresh profile when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshProfile();
+    }, [refreshProfile]),
+  );
 
   // Load user role from AsyncStorage
   useEffect(() => {
@@ -47,11 +57,11 @@ export default function ProfileScreen() {
     try {
       await logout();
       console.log("Logout successful");
-      router.push("/onboarding/HomePage");
+      router.replace("/");
     } catch (error) {
       console.error("Logout error:", error);
       // Still navigate to homepage even if logout API fails
-      router.push("/onboarding/HomePage");
+      router.replace("/");
     }
   };
 
@@ -66,12 +76,20 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
           >
             <View style={styles.avatarContainer}>
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-                }}
-                style={styles.avatar}
-              />
+              {user?.avatar || (user as any)?.profileImage ? (
+                <Image
+                  key={user?.avatar || (user as any)?.profileImage}
+                  source={{ uri: user?.avatar || (user as any)?.profileImage }}
+                  style={styles.avatar}
+                  contentFit="cover"
+                  cachePolicy="none"
+                />
+              ) : (
+                <Image
+                  source={require("../../assets/sam b.png")}
+                  style={styles.avatar}
+                />
+              )}
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
@@ -112,7 +130,10 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/add-property")}
+            onPress={() => {
+              const targetInterest = isBothMode ? activeView : userInterest;
+              router.push(targetInterest === "cars" ? "/add-car" : "/add-house");
+            }}
           >
             <View style={styles.menuLeft}>
               <Ionicons name="add-circle-outline" size={24} color="#666" />
@@ -162,10 +183,21 @@ export default function ProfileScreen() {
           activeOpacity={0.7}
         >
           <View style={styles.avatarContainer}>
-            <Image
-              source={{ uri: "https://via.placeholder.com/80x80" }}
-              style={styles.avatar}
-            />
+            {user?.avatar || (user as any)?.profileImage ? (
+              <Image
+                key={user?.avatar || (user as any)?.profileImage}
+                source={{ uri: user?.avatar || (user as any)?.profileImage }}
+                style={styles.avatar}
+                contentFit="cover"
+                cachePolicy="none"
+              />
+            ) : (
+              <Image
+                source={require("../../assets/sam b.png")}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+            )}
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
@@ -189,17 +221,6 @@ export default function ProfileScreen() {
           <View style={styles.menuLeft}>
             <Ionicons name="person-outline" size={24} color="#666" />
             <Text style={styles.menuText}>View Full Profile</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#666" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => handleMenuPress("Personal Information")}
-        >
-          <View style={styles.menuLeft}>
-            <Ionicons name="document-text-outline" size={24} color="#666" />
-            <Text style={styles.menuText}>Personal Information</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#666" />
         </TouchableOpacity>

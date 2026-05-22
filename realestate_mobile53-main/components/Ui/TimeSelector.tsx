@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flex: 1,
     marginLeft: 10,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
   },
 });
 

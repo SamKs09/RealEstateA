@@ -1,6 +1,7 @@
 const ChatThread = require("../models/chatThreadModel");
 const Message = require("../models/messageModel");
 const User = require("../models/userModel");
+const Analytics = require("../models/analyticsModel");
 const logger = require("../utils/logger");
 
 /**
@@ -32,10 +33,21 @@ class MessageService {
 
       // Check if thread already exists for user-to-user
       if (type === "user_to_user" && participants.length === 2) {
-        const existingThread = await ChatThread.findThreadBetweenUsers(
-          participants[0].userId,
-          participants[1].userId
-        );
+        const listingId = metadata?.listingId ? metadata.listingId.toString() : null;
+        const listingType = metadata?.listingType || null;
+        const existingThread = await ChatThread.findOne({
+          type: "user_to_user",
+          "participants.userId": {
+            $all: [participants[0].userId, participants[1].userId],
+          },
+          isDeleted: false,
+          ...(listingId && listingType
+            ? {
+                "metadata.listingId": metadata.listingId,
+                "metadata.listingType": listingType,
+              }
+            : {}),
+        });
         if (existingThread) {
           return existingThread;
         }
@@ -213,6 +225,11 @@ class MessageService {
         : thread.participants.find(
           (p) => p.userId.toString() === senderId.toString()
         )?.role || "user";
+      const shouldRecordInquiry =
+        senderRole === "user" &&
+        thread.messageCount === 0 &&
+        !!thread.metadata?.listingId &&
+        !!thread.metadata?.listingType;
 
       // Create message
       const message = await Message.create({
@@ -241,6 +258,63 @@ class MessageService {
       thread.updatedAt = new Date();
 
       await thread.save();
+
+      if (shouldRecordInquiry) {
+        try {
+          const sellerParticipant = thread.participants.find(
+            (participant) => participant.role === "owner"
+          );
+
+          if (sellerParticipant) {
+            const analytics = await Analytics.getOrCreate(
+              thread.metadata.listingId,
+              thread.metadata.listingType === "property" ? "Property" : "Vehicle",
+              sellerParticipant.userId
+            );
+
+            await analytics.recordInquiry(
+              senderId,
+              content?.text || "Initial buyer message"
+            );
+          }
+        } catch (analyticsError) {
+          logger.warn(`Failed to record inquiry analytics from first message: ${analyticsError.message}`);
+        }
+      }
+
+      // Trigger notifications for other participants
+      const { sendNotification } = require("../utils/notificationHelper");
+      const { getTemplate } = require("../utils/notificationTemplates");
+      const otherParticipants = thread.participants.filter(
+        (p) => p.userId.toString() !== senderId.toString()
+      );
+
+      for (const participant of otherParticipants) {
+        let notificationType = "message";
+        let tpl;
+
+        if (
+          thread.type === "user_to_support" &&
+          (senderRole === "support" || senderRole === "admin")
+        ) {
+          notificationType = "support_reply";
+          tpl = getTemplate("support_reply", sender.firstName || sender.email);
+        } else {
+          tpl = getTemplate("message", sender.firstName || sender.email);
+        }
+
+        await sendNotification(
+          participant.userId,
+          notificationType,
+          tpl.title,
+          tpl.body,
+          {
+            deepLink: `/chat/${threadId}`,
+            relatedId: threadId,
+            senderId: senderId,
+          }
+        );
+      }
 
       // Populate message
       await message.populate("sender.userId", "fullName firstName lastName avatar");

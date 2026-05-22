@@ -9,13 +9,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslation } from "../../hooks/useTranslation";
 import { BackButton } from "../../components/Ui";
 import i18n from "../../services/i18n";
 
 export default function SupportScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const [locale, setLocale] = useState(i18n.locale);
   const [activeTab, setActiveTab] = useState<"faq" | "contact">("faq");
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);

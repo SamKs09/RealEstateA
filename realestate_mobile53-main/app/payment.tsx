@@ -9,13 +9,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { t } from "../services/i18n";
+import { useTranslation } from "../hooks/useTranslation";
 import {
   Colors,
   Spacing,
   Typography,
   BorderRadius,
-  Shadows,
 } from "../components/styles";
 import PrimaryButton from "../components/Ui/PrimaryButton";
 import { SectionCard } from "../components/Ui";
@@ -23,6 +22,7 @@ import { useInterest } from "../contexts/InterestContext";
 
 export default function PaymentScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
   const { userInterest } = useInterest();
 
@@ -95,6 +95,10 @@ export default function PaymentScreen() {
     }
   }, [params.checkInDate, params.checkOutDate, numberOfNights]);
 
+
+
+
+
   // const paymentMethods = [
   //   {
   //     id: "card",
@@ -166,7 +170,7 @@ export default function PaymentScreen() {
                   <Text style={styles.detailText}>
                     {userInterest === "cars"
                       ? "450 kW"
-                      : t("property.bedrooms", "3 Bedroom")}
+                      : t("property.bedrooms")}
                   </Text>
                 </View>
                 <View style={styles.detailItem}>
@@ -174,7 +178,7 @@ export default function PaymentScreen() {
                   <Text style={styles.detailText}>
                     {userInterest === "cars"
                       ? "280 km/h"
-                      : t("property.bathrooms", "1 Bathroom")}
+                      : t("property.bathrooms")}
                   </Text>
                 </View>
               </View>
@@ -188,14 +192,18 @@ export default function PaymentScreen() {
           <View style={styles.datesContainer}>
             <View style={styles.dateButton}>
               <Text style={styles.dateLabel}>
-                {userInterest === "cars" ? "Pickup" : t("payment.from")}
+                {userInterest === "cars"
+                  ? t("payment.pickup")
+                  : t("payment.from")}
               </Text>
               <Text style={styles.dateText}>{checkInDate || "22/09/2025"}</Text>
               <Text style={styles.timeText}>{arrivingTime}</Text>
             </View>
             <View style={styles.dateButton}>
               <Text style={styles.dateLabel}>
-                {userInterest === "cars" ? "Return" : t("payment.to")}
+                {userInterest === "cars"
+                  ? t("payment.return")
+                  : t("payment.to")}
               </Text>
               <Text style={styles.dateText}>
                 {checkOutDate || "23/09/2025"}
@@ -214,11 +222,13 @@ export default function PaymentScreen() {
                 <View style={[styles.circle, styles.redCircle]} />
                 <View style={[styles.circle, styles.yellowCircle]} />
               </View>
-              <Text style={styles.mastercardText}>Master Card</Text>
+              <Text style={styles.mastercardText}>{t("payment.masterCard")}</Text>
             </View>
             <Text style={styles.cardDetails}>**** **** **** 7852</Text>
           </View>
         </SectionCard>
+
+
       </ScrollView>
 
       {/* Pay Now Button */}
@@ -349,7 +359,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.textPrimary,
     marginBottom: 2,
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-600SemiBold",
   },
   dateLabel: {
     fontSize: Typography.fontSize.xs,
@@ -361,12 +371,61 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.normal,
-    fontFamily: "comfortaa-400Regular",
+    fontFamily: "raleway-400Regular",
     color: Colors.textSecondary,
   },
   // Payment Section Styles
   paymentSection: {
     marginVertical: Spacing.lg,
+  },
+  historySection: {
+    marginVertical: Spacing.lg,
+  },
+  historyTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: "raleway-500Medium",
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xl,
+  },
+  historyContainer: {
+    gap: Spacing.md,
+  },
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+  },
+  historyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyDesc: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  historyDate: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    fontFamily: "raleway-400Regular",
+  },
+  historyAmount: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  emptyText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: Spacing.md,
   },
   paymentTitle: {
     fontSize: Typography.fontSize.xl,
@@ -408,7 +467,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   cardDetails: {
-    fontFamily: "comfortaa-500Medium",
+    fontFamily: "raleway-500Medium",
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
     marginTop: 5,

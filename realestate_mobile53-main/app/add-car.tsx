@@ -8,65 +8,50 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Image } from "expo-image";
-import { useLanguage } from "../contexts/LanguageContext";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useTranslation } from "../hooks/useTranslation";
 import { BackButton, SuccessModal, MapPicker } from "../components/Ui";
 import { vehicleService } from "../services";
-import i18n from "../services/i18n";
 
-export default function AddCarScreen() {
+export default function AddCarNewScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
-  const [locale, setLocale] = useState(i18n.locale);
+  const { t } = useTranslation();
 
-  // Listen for language changes - same pattern as _layout.tsx
-  React.useEffect(() => {
-    const checkLocale = setInterval(() => {
-      if (i18n.locale !== locale) {
-        setLocale(i18n.locale);
-      }
-    }, 100);
-
-    return () => clearInterval(checkLocale);
-  }, [locale]);
-
-  const [selectedImages, setSelectedImages] = useState<
-    ImagePicker.ImagePickerAsset[]
-  >([]);
+  const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [vehicleType, setVehicleType] = useState<"car" | "motorcycle">("car");
+
   const [formData, setFormData] = useState({
-    // Required fields
-    title: "",
-    description: "",
-    type: "car",
-    listingType: "sale",
-    make: "",
+    brand: "",
     model: "",
+    powertrain: "",
+    transmission: "",
+    power: "",
+    maximumSpeed: "",
+    batteryCapacity: "",
+    firstRegistration: new Date(),
+    // Motorcycle specific fields
+    engineCC: "",
     year: new Date().getFullYear().toString(),
-    city: "",
-    country: "",
-
-    // Optional vehicle details
-    color: "",
     mileage: "",
-    fuelType: "petrol",
-    transmission: "automatic",
-    condition: "used",
-
-    // Pricing
-    salePrice: "",
-    rentPrice: "",
-    rentPeriod: "daily",
-
-    // Location coordinates (auto-filled)
+    powerHP: "",
+    // Common fields
+    fuelType: "gasoline",
+    price: "",
+    description: "",
+    city: "",
+    country: "Tunisia",
     latitude: 0,
     longitude: 0,
   });
@@ -94,7 +79,7 @@ export default function AddCarScreen() {
     }
   };
 
-  const updateFormData = (key: string, value: string) => {
+  const updateFormData = (key: string, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -122,10 +107,7 @@ export default function AddCarScreen() {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleLocationSelect = (location: {
-    latitude: number;
-    longitude: number;
-  }) => {
+  const handleLocationSelect = (location: { latitude: number; longitude: number }) => {
     setFormData((prev) => ({
       ...prev,
       latitude: location.latitude,
@@ -134,76 +116,58 @@ export default function AddCarScreen() {
     setShowMapPicker(false);
   };
 
+  const formatDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === "ios");
+    if (selectedDate) {
+      updateFormData("firstRegistration", selectedDate);
+    }
+  };
+
   const handleSubmit = async () => {
     // Validate required fields
-    if (!formData.title.trim()) {
-      Alert.alert(t("error"), t("enterVehicleTitle"));
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      Alert.alert(t("error"), t("enterDescription"));
-      return;
-    }
-
-    if (!formData.make.trim()) {
-      Alert.alert(t("error"), t("enterVehicleMake"));
+    if (!formData.brand.trim()) {
+      Alert.alert(t("addCar.error"), "Please enter the vehicle brand");
       return;
     }
 
     if (!formData.model.trim()) {
-      Alert.alert(t("error"), t("enterVehicleModel"));
+      Alert.alert(t("addCar.error"), "Please enter the vehicle model");
       return;
     }
 
-    if (!formData.city.trim() || !formData.country.trim()) {
-      Alert.alert(t("error"), t("enterCityCountry"));
+    if (!formData.price || parseFloat(formData.price) <= 0) {
+      Alert.alert(t("addCar.error"), "Please enter a valid price");
       return;
     }
 
-    // Validate pricing based on listing type
-    if (formData.listingType === "sale") {
-      if (!formData.salePrice || parseFloat(formData.salePrice) <= 0) {
-        Alert.alert(t("error"), t("enterValidSalePrice"));
-        return;
-      }
-    } else {
-      if (!formData.rentPrice || parseFloat(formData.rentPrice) <= 0) {
-        Alert.alert(t("error"), t("enterValidRentPrice"));
-        return;
-      }
+    if (!formData.description.trim()) {
+      Alert.alert(t("addCar.error"), "Please enter a description");
+      return;
     }
 
     if (selectedImages.length === 0) {
-      Alert.alert(t("error"), t("addAtLeastOneImage"));
+      Alert.alert(t("addCar.error"), t("addCar.addAtLeastOneImage"));
       return;
     }
 
     try {
       setLoading(true);
 
-      // Prepare vehicle data
-      const vehicleData = {
-        title: formData.title.trim(),
+      // Prepare vehicle data based on type
+      let vehicleData: any = {
+        title: `${formData.brand} ${formData.model}`.trim(),
         description: formData.description.trim(),
-        type: formData.type as "car" | "motorcycle" | "truck" | "van" | "bus",
-        listingType: formData.listingType as "sale" | "rent",
-        vehicleDetails: {
-          make: formData.make.trim(),
-          model: formData.model.trim(),
-          year: parseInt(formData.year),
-          ...(formData.color && { color: formData.color }),
-          ...(formData.mileage && { mileage: parseInt(formData.mileage) }),
-          fuelType: formData.fuelType as
-            | "petrol"
-            | "diesel"
-            | "electric"
-            | "hybrid",
-          transmission: formData.transmission as "manual" | "automatic",
-          condition: formData.condition as "new" | "used" | "certified",
-        },
+        type: vehicleType,
+        listingType: "sale" as "sale" | "rent",
         location: {
-          city: formData.city.trim(),
+          city: formData.city.trim() || "Tunisia",
           country: formData.country.trim(),
           ...(formData.latitude &&
             formData.longitude && {
@@ -213,43 +177,79 @@ export default function AddCarScreen() {
               },
             }),
         },
-        pricing:
-          formData.listingType === "sale"
-            ? {
-                salePrice: parseFloat(formData.salePrice),
-                currency: "USD",
-              }
-            : {
-                rentPrice: parseFloat(formData.rentPrice),
-                rentPeriod: formData.rentPeriod as
-                  | "daily"
-                  | "weekly"
-                  | "monthly",
-                currency: "USD",
-              },
+        pricing: {
+          salePrice: parseFloat(formData.price),
+          currency: "USD",
+          negotiable: true,
+        },
       };
 
-      console.log("Submitting vehicle data:", vehicleData);
+      if (vehicleType === "motorcycle") {
+        // Motorcycle-specific data
+        vehicleData.vehicleDetails = {
+          make: formData.brand.trim(),
+          model: formData.model.trim(),
+          year: parseInt(formData.year) || new Date().getFullYear(),
+          fuelType: formData.fuelType as "petrol" | "diesel" | "electric" | "hybrid",
+          condition: "used" as "new" | "used" | "certified",
+          ...(formData.engineCC && { engineCapacity: parseInt(formData.engineCC) }),
+          ...(formData.mileage && { mileage: parseInt(formData.mileage) }),
+          ...(formData.powerHP && { 
+            features: [`${formData.powerHP} HP`] 
+          }),
+        };
+      } else {
+        // Car-specific data
+        const powerValue = formData.power ? parseInt(formData.power.replace(/[^0-9]/g, "")) : undefined;
+        
+        let transmissionValue: "manual" | "automatic" | undefined;
+        if (formData.transmission.trim()) {
+          const trans = formData.transmission.toLowerCase().trim();
+          if (trans.includes("manual")) {
+            transmissionValue = "manual";
+          } else if (trans.includes("auto")) {
+            transmissionValue = "automatic";
+          } else {
+            transmissionValue = "automatic";
+          }
+        }
+
+        vehicleData.vehicleDetails = {
+          make: formData.brand.trim(),
+          model: formData.model.trim(),
+          year: formData.firstRegistration.getFullYear(),
+          fuelType: formData.fuelType as "petrol" | "diesel" | "electric" | "hybrid",
+          ...(transmissionValue && { transmission: transmissionValue }),
+          condition: "used" as "new" | "used" | "certified",
+          ...(powerValue && { engineCapacity: powerValue }),
+          ...(formData.powertrain && { features: [formData.powertrain] }),
+        };
+      }
+
+      console.log("📤 Submitting vehicle data:", vehicleData);
 
       // Create vehicle
       const response = await vehicleService.createVehicle(vehicleData);
 
-      console.log("Vehicle created:", response);
+      console.log("✅ Vehicle created:", response);
 
       // Upload images if vehicle was created
-      if (response.success && response.data._id) {
-        const images = selectedImages.map((image, index) => ({
-          uri: image.uri,
-          name: `vehicle_${Date.now()}_${index}.jpg`,
-          type: "image/jpeg",
-        }));
+      if (response.success && (response.data._id || response.data.id)) {
+        const vehicleId = (response.data._id || response.data.id) as string;
+        if (vehicleId) {
+          const images = selectedImages.map((image, index) => ({
+            uri: image.uri,
+            name: `vehicle_${Date.now()}_${index}.jpg`,
+            type: "image/jpeg",
+          }));
 
-        await vehicleService.uploadVehicleImages(response.data._id, images);
+          await vehicleService.uploadVehicleImages(vehicleId, images);
+        }
       }
 
       setShowSuccessModal(true);
     } catch (error: any) {
-      console.error("Error creating vehicle:", error);
+      console.error("❌ Error creating vehicle:", error);
       const errorMessage =
         error?.message || error?.errors?.[0] || t("addCar.failedToCreate");
       Alert.alert(t("addCar.error"), errorMessage);
@@ -262,10 +262,11 @@ export default function AddCarScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <BackButton onPress={() => router.back()} color="#A0A09E" />
-        </View>
-        <Text style={styles.headerTitle}>{t("addCar.addNewVehicle")}</Text>
+        <BackButton onPress={() => router.back()} color="#FF8C42" />
+        <Text style={styles.headerTitle}>
+          {vehicleType === "motorcycle" ? "Add new Motorcycle" : "Add new Car"}
+        </Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -273,177 +274,232 @@ export default function AddCarScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Title */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.vehicleTitle")} *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t("addCar.vehicleTitlePlaceholder")}
-            value={formData.title}
-            onChangeText={(text) => updateFormData("title", text)}
-          />
-        </View>
-
-        {/* Type */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.vehicleType")} *</Text>
-          <View style={styles.selectContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.selectOptions}
+        {/* Vehicle Type Selector */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Vehicle Type</Text>
+          <View style={styles.fuelTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.fuelTypeButton,
+                vehicleType === "car" && styles.fuelTypeButtonActive,
+              ]}
+              onPress={() => setVehicleType("car")}
             >
-              {["car", "motorcycle", "truck", "van", "bus"].map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.selectOption,
-                    formData.type === type && styles.selectOptionActive,
-                  ]}
-                  onPress={() => updateFormData("type", type)}
-                >
-                  <Text
-                    style={[
-                      styles.selectOptionText,
-                      formData.type === type && styles.selectOptionTextActive,
-                    ]}
-                  >
-                    {t(`addCar.${type}`)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <Text
+                style={[
+                  styles.fuelTypeText,
+                  vehicleType === "car" && styles.fuelTypeTextActive,
+                ]}
+              >
+                Car
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.fuelTypeButton,
+                vehicleType === "motorcycle" && styles.fuelTypeButtonActive,
+              ]}
+              onPress={() => setVehicleType("motorcycle")}
+            >
+              <Text
+                style={[
+                  styles.fuelTypeText,
+                  vehicleType === "motorcycle" && styles.fuelTypeTextActive,
+                ]}
+              >
+                Motorcycle
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        {/* Listing Type */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.listingType")} *</Text>
-          <View style={styles.selectContainer}>
-            <View style={styles.selectOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.selectOption,
-                  formData.listingType === "sale" && styles.selectOptionActive,
-                ]}
-                onPress={() => updateFormData("listingType", "sale")}
-              >
-                <Text
-                  style={[
-                    styles.selectOptionText,
-                    formData.listingType === "sale" &&
-                      styles.selectOptionTextActive,
-                  ]}
-                >
-                  {t("addCar.forSale")}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.selectOption,
-                  formData.listingType === "rent" && styles.selectOptionActive,
-                ]}
-                onPress={() => updateFormData("listingType", "rent")}
-              >
-                <Text
-                  style={[
-                    styles.selectOptionText,
-                    formData.listingType === "rent" &&
-                      styles.selectOptionTextActive,
-                  ]}
-                >
-                  {t("addCar.forRent")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Make */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.make")} *</Text>
+        {/* Brand */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Brand</Text>
           <TextInput
             style={styles.input}
-            placeholder={t("addCar.makePlaceholder")}
-            value={formData.make}
-            onChangeText={(text) => updateFormData("make", text)}
+            placeholder="BMW"
+            placeholderTextColor="#CCCCCC"
+            value={formData.brand}
+            onChangeText={(text) => updateFormData("brand", text)}
           />
         </View>
 
         {/* Model */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.model")} *</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Model</Text>
           <TextInput
             style={styles.input}
-            placeholder={t("addCar.modelPlaceholder")}
+            placeholder="Electric"
+            placeholderTextColor="#CCCCCC"
             value={formData.model}
             onChangeText={(text) => updateFormData("model", text)}
           />
         </View>
 
-        {/* Year */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.year")} *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t("addCar.yearPlaceholder")}
-            value={formData.year}
-            onChangeText={(text) => updateFormData("year", text)}
-            keyboardType="numeric"
-          />
-        </View>
+        {/* Conditional Fields Based on Vehicle Type */}
+        {vehicleType === "motorcycle" ? (
+          <>
+            {/* Engine (cc) - Motorcycle */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Engine (cc)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="689"
+                placeholderTextColor="#CCCCCC"
+                value={formData.engineCC}
+                onChangeText={(text) => updateFormData("engineCC", text)}
+                keyboardType="numeric"
+              />
+            </View>
 
-        {/* Color */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>
-            {t("addCar.color")} ({t("addCar.optional")})
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t("addCar.colorPlaceholder")}
-            value={formData.color}
-            onChangeText={(text) => updateFormData("color", text)}
-          />
-        </View>
+            {/* Year - Motorcycle */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Year</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="2024"
+                placeholderTextColor="#CCCCCC"
+                value={formData.year}
+                onChangeText={(text) => updateFormData("year", text)}
+                keyboardType="numeric"
+              />
+            </View>
 
-        {/* Mileage */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>
-            {t("addCar.mileage")} ({t("addCar.optional")})
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={t("addCar.mileagePlaceholder")}
-            value={formData.mileage}
-            onChangeText={(text) => updateFormData("mileage", text)}
-            keyboardType="numeric"
-          />
-        </View>
+            {/* Mileage (km) - Motorcycle */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Mileage (km)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="15000"
+                placeholderTextColor="#CCCCCC"
+                value={formData.mileage}
+                onChangeText={(text) => updateFormData("mileage", text)}
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Power (hp) - Motorcycle */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Power (hp)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="95"
+                placeholderTextColor="#CCCCCC"
+                value={formData.powerHP}
+                onChangeText={(text) => updateFormData("powerHP", text)}
+                keyboardType="numeric"
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Car-specific fields */}
+            {/* Powertrain */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Powertrain</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Electric"
+                placeholderTextColor="#CCCCCC"
+                value={formData.powertrain}
+                onChangeText={(text) => updateFormData("powertrain", text)}
+              />
+            </View>
+
+            {/* Transmission */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Transmission</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="automatic or manual"
+                placeholderTextColor="#CCCCCC"
+                value={formData.transmission}
+                onChangeText={(text) => updateFormData("transmission", text)}
+              />
+            </View>
+
+            {/* Power */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Power</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="250 kw"
+                placeholderTextColor="#CCCCCC"
+                value={formData.power}
+                onChangeText={(text) => updateFormData("power", text)}
+              />
+            </View>
+
+            {/* Maximum speed */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Maximum speed</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="193K/H"
+                placeholderTextColor="#CCCCCC"
+                value={formData.maximumSpeed}
+                onChangeText={(text) => updateFormData("maximumSpeed", text)}
+              />
+            </View>
+
+            {/* Battery capacity */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Battery capacity</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="83/81 KWH"
+                placeholderTextColor="#CCCCCC"
+                value={formData.batteryCapacity}
+                onChangeText={(text) => updateFormData("batteryCapacity", text)}
+              />
+            </View>
+
+            {/* First registration */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>First registration</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.inputText}>
+                  {formatDate(formData.firstRegistration)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={formData.firstRegistration}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            )}
+          </>
+        )}
 
         {/* Fuel Type */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.fuelType")}</Text>
-          <View style={styles.buttonRow}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Fuel Type</Text>
+          <View style={styles.fuelTypeContainer}>
             {[
-              { label: t("addCar.petrol"), value: "petrol" },
-              { label: t("addCar.diesel"), value: "diesel" },
-              { label: t("addCar.electric"), value: "electric" },
-              { label: t("addCar.hybrid"), value: "hybrid" },
+              { label: "Gasoline", value: "petrol" },
+              { label: "Diesel", value: "diesel" },
+              { label: "Electric", value: "electric" },
             ].map((option) => (
               <TouchableOpacity
                 key={option.value}
                 style={[
-                  styles.optionButton,
-                  formData.fuelType === option.value &&
-                    styles.optionButtonActive,
+                  styles.fuelTypeButton,
+                  formData.fuelType === option.value && styles.fuelTypeButtonActive,
                 ]}
                 onPress={() => updateFormData("fuelType", option.value)}
               >
                 <Text
                   style={[
-                    styles.optionButtonText,
-                    formData.fuelType === option.value &&
-                      styles.optionButtonTextActive,
+                    styles.fuelTypeText,
+                    formData.fuelType === option.value && styles.fuelTypeTextActive,
                   ]}
                 >
                   {option.label}
@@ -453,145 +509,28 @@ export default function AddCarScreen() {
           </View>
         </View>
 
-        {/* Transmission */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.transmission")}</Text>
-          <View style={styles.buttonRow}>
-            {[
-              { label: t("addCar.automatic"), value: "automatic" },
-              { label: t("addCar.manual"), value: "manual" },
-            ].map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.optionButton,
-                  formData.transmission === option.value &&
-                    styles.optionButtonActive,
-                ]}
-                onPress={() => updateFormData("transmission", option.value)}
-              >
-                <Text
-                  style={[
-                    styles.optionButtonText,
-                    formData.transmission === option.value &&
-                      styles.optionButtonTextActive,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Condition */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.condition")}</Text>
-          <View style={styles.buttonRow}>
-            {[
-              { label: t("addCar.new"), value: "new" },
-              { label: t("addCar.used"), value: "used" },
-              { label: t("addCar.certified"), value: "certified" },
-            ].map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.optionButton,
-                  formData.condition === option.value &&
-                    styles.optionButtonActive,
-                ]}
-                onPress={() => updateFormData("condition", option.value)}
-              >
-                <Text
-                  style={[
-                    styles.optionButtonText,
-                    formData.condition === option.value &&
-                      styles.optionButtonTextActive,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Pricing - Conditional based on listing type */}
-        {formData.listingType === "sale" ? (
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t("addCar.salePrice")} (USD) *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("addCar.salePricePlaceholder")}
-              value={formData.salePrice}
-              onChangeText={(text) => updateFormData("salePrice", text)}
-              keyboardType="numeric"
-            />
-          </View>
-        ) : (
-          <>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t("addCar.rentPrice")} (USD) *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t("addCar.rentPricePlaceholder")}
-                value={formData.rentPrice}
-                onChangeText={(text) => updateFormData("rentPrice", text)}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t("addCar.rentPeriod")}</Text>
-              <View style={styles.buttonRow}>
-                {[
-                  { label: t("addCar.daily"), value: "daily" },
-                  { label: t("addCar.weekly"), value: "weekly" },
-                  { label: t("addCar.monthly"), value: "monthly" },
-                ].map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.optionButton,
-                      formData.rentPeriod === option.value &&
-                        styles.optionButtonActive,
-                    ]}
-                    onPress={() => updateFormData("rentPeriod", option.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.optionButtonText,
-                        formData.rentPeriod === option.value &&
-                          styles.optionButtonTextActive,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* City */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.city")} *</Text>
+        {/* Price */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Price</Text>
           <TextInput
             style={styles.input}
-            placeholder={t("addCar.cityPlaceholder")}
-            value={formData.city}
-            onChangeText={(text) => updateFormData("city", text)}
+            placeholder="35,000"
+            placeholderTextColor="#CCCCCC"
+            value={formData.price}
+            onChangeText={(text) => updateFormData("price", text)}
+            keyboardType="numeric"
           />
         </View>
 
-        {/* Country */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.country")} *</Text>
+        {/* City (hidden but required for backend) */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>City</Text>
           <TextInput
             style={styles.input}
-            placeholder={t("addCar.countryPlaceholder")}
-            value={formData.country}
-            onChangeText={(text) => updateFormData("country", text)}
+            placeholder="Enter city"
+            placeholderTextColor="#CCCCCC"
+            value={formData.city}
+            onChangeText={(text) => updateFormData("city", text)}
           />
         </View>
 
@@ -600,34 +539,35 @@ export default function AddCarScreen() {
           style={styles.locationButton}
           onPress={() => setShowMapPicker(true)}
         >
-          <Ionicons name="location-outline" size={24} color="#FF6B35" />
+          <Ionicons name="location-outline" size={20} color="#FF8C42" />
           <Text style={styles.locationButtonText}>
             {formData.latitude && formData.longitude
-              ? t("addCar.locationSelected")
-              : t("addCar.selectLocationOnMap")}
+              ? "Location selected"
+              : "Select location on map"}
           </Text>
         </TouchableOpacity>
 
         {/* Description */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>{t("addCar.description")} *</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder={t("addCar.descriptionPlaceholder")}
+            placeholder="The BMW i5 is an all-electric sedan known for its sustainable luxury and advanced technology. Key features."
+            placeholderTextColor="#CCCCCC"
             value={formData.description}
             onChangeText={(text) => updateFormData("description", text)}
             multiline
-            numberOfLines={6}
+            numberOfLines={4}
           />
         </View>
 
-        {/* Upload image button */}
+        {/* Upload image */}
         <TouchableOpacity style={styles.uploadButton} onPress={pickImages}>
-          <Ionicons name="add" size={32} color="#FF6B35" />
-          <Text style={styles.uploadText}>{t("addCar.uploadImages")} *</Text>
+          <Ionicons name="add" size={32} color="#FF8C42" />
+          <Text style={styles.uploadText}>Upload image</Text>
           {selectedImages.length > 0 && (
             <Text style={styles.imageCount}>
-              {selectedImages.length} {t("addCar.imagesSelected")}
+              {selectedImages.length} image{selectedImages.length > 1 ? "s" : ""} selected
             </Text>
           )}
         </TouchableOpacity>
@@ -649,7 +589,7 @@ export default function AddCarScreen() {
           </View>
         )}
 
-        {/* Add Item button */}
+        {/* Add item button */}
         <TouchableOpacity
           style={[styles.addButton, loading && styles.addButtonDisabled]}
           onPress={handleSubmit}
@@ -658,9 +598,7 @@ export default function AddCarScreen() {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.addButtonText}>
-              {t("addCar.createListing")}
-            </Text>
+            <Text style={styles.addButtonText}>Add item</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -701,21 +639,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
   },
-  headerTop: {
-    marginBottom: 16,
-  },
-  backButton: {
-    marginRight: 16,
-  },
   headerTitle: {
-    textAlign: "center",
-    fontSize: 24,
-    fontFamily: "Raleway-Bold",
-    color: "#FF6B35",
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#FF8C42",
+    fontFamily: "raleway-500Medium",
   },
   scrollView: {
     flex: 1,
@@ -724,63 +659,78 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  inputContainer: {
-    marginTop: 24,
-    position: "relative",
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
-    position: "absolute",
-    top: -10,
-    left: 20,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 8,
     fontSize: 14,
-    fontFamily: "Raleway-SemiBold",
-    color: "#FF6B35",
-    zIndex: 1,
+    color: "#FF8C42",
+    marginBottom: 8,
+    fontFamily: "raleway-400Regular",
   },
   input: {
     backgroundColor: "#FFFFFF",
     borderRadius: 25,
     paddingHorizontal: 20,
     paddingVertical: 14,
-    fontSize: 14,
-    fontFamily: "Raleway",
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E8E8E8",
     color: "#333333",
   },
-  pickerContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    overflow: "hidden",
-  },
-  picker: {
+  inputText: {
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
     color: "#333333",
-    fontFamily: "Raleway",
   },
   textArea: {
-    height: 150,
+    height: 100,
     textAlignVertical: "top",
     paddingTop: 14,
   },
-  locationButton: {
-    backgroundColor: "#FFFFFF",
+  fuelTypeContainer: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  fuelTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 25,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+  },
+  fuelTypeButtonActive: {
+    borderColor: "#FF8C42",
+    backgroundColor: "#FFF5F0",
+  },
+  fuelTypeText: {
+    fontSize: 14,
+    fontFamily: "raleway-400Regular",
+    color: "#999999",
+  },
+  fuelTypeTextActive: {
+    color: "#FF8C42",
+    fontWeight: "500",
+  },
+  locationButton: {
     flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginTop: 24,
+    borderColor: "#E8E8E8",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 20,
   },
   locationButtonText: {
-    fontSize: 16,
-    fontFamily: "Raleway-SemiBold",
-    color: "#FF6B35",
+    fontSize: 14,
+    fontFamily: "raleway-400Regular",
+    color: "#FF8C42",
     marginLeft: 8,
   },
   uploadButton: {
@@ -790,41 +740,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginTop: 24,
+    borderColor: "#E8E8E8",
+    marginBottom: 20,
   },
   uploadText: {
     fontSize: 16,
-    fontFamily: "Raleway-SemiBold",
-    color: "#FF6B35",
+    fontFamily: "raleway-500Medium",
+    color: "#FF8C42",
     marginTop: 8,
-  },
-  addButton: {
-    backgroundColor: "#FF6B35",
-    borderRadius: 25,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 40,
-  },
-  addButtonDisabled: {
-    opacity: 0.6,
-  },
-  addButtonText: {
-    fontSize: 18,
-    fontFamily: "Raleway-Bold",
-    color: "#FFFFFF",
   },
   imageCount: {
-    fontSize: 14,
-    fontFamily: "Raleway",
-    color: "#666666",
-    marginTop: 8,
+    fontSize: 13,
+    fontFamily: "raleway-400Regular",
+    color: "#999999",
+    marginTop: 4,
   },
   imageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 20,
+    marginBottom: 20,
   },
   imageContainer: {
     width: "31%",
@@ -834,7 +769,7 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
+    borderRadius: 12,
   },
   removeImageButton: {
     position: "absolute",
@@ -843,71 +778,20 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 12,
   },
-  // Custom select styles for horizontal scrollable options
-  selectContainer: {
-    backgroundColor: "#FFFFFF",
+  addButton: {
+    backgroundColor: "#FF8C42",
     borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    paddingVertical: 10,
-  },
-  selectOptions: {
-    flexDirection: "row",
-    paddingHorizontal: 10,
-    gap: 8,
-  },
-  selectOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  selectOptionActive: {
-    backgroundColor: "#FF6B35",
-    borderColor: "#FF6B35",
-  },
-  selectOptionText: {
-    fontSize: 14,
-    fontFamily: "Raleway-SemiBold",
-    color: "#666666",
-  },
-  selectOptionTextActive: {
-    color: "#FFFFFF",
-  },
-  // Button row for options like fuel type, transmission, etc.
-  buttonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    padding: 10,
-  },
-  optionButton: {
-    flex: 1,
-    minWidth: "30%",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    paddingVertical: 16,
     alignItems: "center",
+    marginTop: 20,
   },
-  optionButtonActive: {
-    backgroundColor: "#FF6B35",
-    borderColor: "#FF6B35",
+  addButtonDisabled: {
+    opacity: 0.6,
   },
-  optionButtonText: {
-    fontSize: 14,
-    fontFamily: "Raleway-SemiBold",
-    color: "#666666",
-  },
-  optionButtonTextActive: {
+  addButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
     color: "#FFFFFF",
+    fontFamily: "raleway-500Medium",
   },
 });

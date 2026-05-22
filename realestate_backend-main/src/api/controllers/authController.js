@@ -55,7 +55,7 @@ const authCtrl = {
         console.log("Missing fields");
         return res.status(403).json({
           success: false,
-          message: "Not all fields have been entered",
+          message: req.t('missingFields'),
         });
       }
 
@@ -63,7 +63,7 @@ const authCtrl = {
         console.log("Invalid email format");
         return res.status(401).json({
           success: false,
-          message: "Invalid email",
+          message: req.t('invalidEmail'),
         });
       }
 
@@ -72,15 +72,15 @@ const authCtrl = {
         console.log("Email already registered");
         return res.status(400).json({
           success: false,
-          message: "This email is already registered",
+          message: req.t('emailAlreadyRegistered'),
         });
       }
 
-      if (password.length < 6) {
+      if (password.length < 8) {
         console.log("Password too short");
         return res.status(402).json({
           success: false,
-          message: "Password must be at least 6 characters long",
+          message: req.t('passwordTooShort'),
         });
       }
 
@@ -88,7 +88,7 @@ const authCtrl = {
         console.log("Passwords do not match");
         return res.status(405).json({
           success: false,
-          message: "Passwords do not match",
+          message: req.t('passwordsDoNotMatch'),
         });
       }
 
@@ -96,18 +96,21 @@ const authCtrl = {
       console.log("Password hashed");
 
       // Determine role based on userType (simplified to buyer/seller only)
-      let role = ['buyer']; // default
+      let role = 'client'; // default (maps to 'buyer' in UI)
       if (userType === 'seller') {
-        role = ['seller'];
+        role = 'seller';
       } else if (userType === 'buyer') {
-        role = ['buyer'];
+        role = 'client';
       }
-      
+
       // Build user preferences based on interest
       const preferences = {};
       if (interest === 'property') {
         preferences.propertyTypes = [];
       } else if (interest === 'cars') {
+        preferences.vehicleTypes = [];
+      } else if (interest === 'both') {
+        preferences.propertyTypes = [];
         preferences.vehicleTypes = [];
       }
 
@@ -137,7 +140,7 @@ const authCtrl = {
       var data = [{ userId: user._id }, { token: token.token }];
       var ciphertext = CryptoJS.AES.encrypt(
         JSON.stringify(data),
-        "secret key 1234567890"
+        process.env.TOKEN_ENCRYPTION_KEY || "secret key 1234567890"
       )
         .toString()
         .replace(/\+/g, "%2B");
@@ -152,7 +155,7 @@ const authCtrl = {
 
       const message = {
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL,
+        from: (process.env.SENDGRID_FROM_EMAIL || '').trim(),
         subject: "Email Activation",
         text: "Welcome aboard, please confirm your email address",
         html: emailTemplate,
@@ -163,14 +166,14 @@ const authCtrl = {
 
       return res.status(200).json({
         success: true,
-        message: `Registration successful! A verification link has been sent to ${email}. Please check your email to confirm your account.`,
-    
+        message: req.t('registrationSuccessEmail', email),
+
       });
     } catch (err) {
       console.error("Error during registration:", err);
       return res.status(500).json({
         success: false,
-        message: "Server error. Please try again later.",
+        message: req.t('serverError'),
       });
     }
   },
@@ -179,11 +182,11 @@ const authCtrl = {
     try {
       const { password, confirmPassword, phoneNumber, email, firstName, lastName, userType, interest } = req.body;
       console.log(req.body);
-      
+
       if (!validator.isMobilePhone(phoneNumber)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid phone number",
+          message: req.t('invalidPhoneNumber'),
         });
       }
 
@@ -192,7 +195,7 @@ const authCtrl = {
       if (user_phone) {
         return res.status(400).json({
           success: false,
-          message: "This phone is already registered !",
+          message: req.t('phoneAlreadyRegistered'),
         });
       }
 
@@ -200,7 +203,7 @@ const authCtrl = {
       if (!email || !validator.isEmail(email)) {
         return res.status(400).json({
           success: false,
-          message: "Valid email is required for account verification",
+          message: req.t('emailRequiredForVerification'),
         });
       }
 
@@ -209,51 +212,54 @@ const authCtrl = {
       if (user_email) {
         return res.status(400).json({
           success: false,
-          message: "This email is already registered !",
+          message: req.t('emailAlreadyRegistered'),
         });
       }
 
       if (!password || !confirmPassword)
         return res.status(403).json({
           success: false,
-          message: "Not all fields have been entered",
+          message: req.t('missingFields'),
         });
 
       if (password.length < 8) {
         return res.status(402).json({
           success: false,
-          message: "Password must be at least 8 characters long",
+          message: req.t('passwordTooShort'),
         });
       }
-      
+
       if (password !== confirmPassword)
         return res.status(405).json({
           success: false,
-          message: "Password must be identical",
+          message: req.t('passwordsDoNotMatch'),
         });
 
       // Since SMS is not available, we'll use email verification
       if (!isTwilioAvailable()) {
         console.log("📱 SMS not available, using email verification for phone registration");
-        
+
         const passwordHash = await bcrypt.hash(password, 12);
-        
+
         // Determine role based on userType (simplified to buyer/seller only)
-        let role = ['buyer']; // default
+        let role = 'client'; // default (maps to 'buyer' in UI)
         if (userType === 'seller') {
-          role = ['seller'];
+          role = 'seller';
         } else if (userType === 'buyer') {
-          role = ['buyer'];
+          role = 'client';
         }
-        
+
         // Build user preferences based on interest
         const preferences = {};
         if (interest === 'property') {
           preferences.propertyTypes = [];
         } else if (interest === 'cars') {
           preferences.vehicleTypes = [];
+        } else if (interest === 'both') {
+          preferences.propertyTypes = [];
+          preferences.vehicleTypes = [];
         }
-        
+
         const newUser = new Merchants({
           phoneNumber,
           email,
@@ -269,7 +275,7 @@ const authCtrl = {
         });
 
         const user = await newUser.save();
-        
+
         // Generate email verification token
         let token = await Token.findOne({ userId: user._id });
         if (!token) {
@@ -289,7 +295,7 @@ const authCtrl = {
 
         const msg = {
           to: email,
-          from: process.env.SENDGRID_FROM_EMAIL,
+          from: (process.env.SENDGRID_FROM_EMAIL || '').trim(),
           subject: "Verify Your Real Estate Account",
           html: html,
         };
@@ -298,7 +304,7 @@ const authCtrl = {
 
         return res.status(200).json({
           success: true,
-          message: `Registration successful! A verification link has been sent to ${email}. Please check your email to verify your account.`,
+          message: req.t('registrationSuccessEmail', email),
           user: {
             phoneVerified: false,
             emailVerified: false,
@@ -334,7 +340,7 @@ const authCtrl = {
 
         return res.status(200).json({
           success: true,
-          message: "Registration successful! Confirm your phone number with the SMS code.",
+          message: req.t('registrationSuccessPhone'),
           user: {
             phoneVerified: newUser.phoneVerified,
             _id: newUser._id,
@@ -349,12 +355,179 @@ const authCtrl = {
       });
     }
   },
+  registerSellerWithKyc: async (req, res) => {
+    try {
+      const {
+        password,
+        confirmPassword,
+        phoneNumber,
+        email,
+        firstName,
+        lastName,
+        interest,
+        city,
+        documentType,
+      } = req.body;
+
+      const files = req.files || {};
+      const identityFront = files.identityFront?.[0];
+      const identityBack = files.identityBack?.[0];
+      const faceVideo = files.faceVideo?.[0];
+
+      if (!validator.isMobilePhone(phoneNumber || "")) {
+        return res.status(400).json({
+          success: false,
+          message: req.t('invalidPhoneNumber'),
+        });
+      }
+
+      if (!email || !validator.isEmail(email)) {
+        return res.status(400).json({
+          success: false,
+          message: req.t('emailRequiredForVerification'),
+        });
+      }
+
+      if (!password || !confirmPassword) {
+        return res.status(403).json({
+          success: false,
+          message: req.t('missingFields'),
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(402).json({
+          success: false,
+          message: req.t('passwordTooShort'),
+        });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(405).json({
+          success: false,
+          message: req.t('passwordsDoNotMatch'),
+        });
+      }
+
+      if (!city) {
+        return res.status(400).json({
+          success: false,
+          message: 'City is required',
+        });
+      }
+
+      if (!identityFront || !identityBack || !faceVideo) {
+        return res.status(400).json({
+          success: false,
+          message: 'Front document image, back document image, and live face video are required',
+        });
+      }
+
+      const userPhone = await Merchants.findOne({ phoneNumber });
+      if (userPhone) {
+        return res.status(400).json({
+          success: false,
+          message: req.t('phoneAlreadyRegistered'),
+        });
+      }
+
+      const userEmail = await Merchants.findOne({ email });
+      if (userEmail) {
+        return res.status(400).json({
+          success: false,
+          message: req.t('emailAlreadyRegistered'),
+        });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      const preferences = {};
+      if (interest === 'property') {
+        preferences.propertyTypes = [];
+      } else if (interest === 'cars') {
+        preferences.vehicleTypes = [];
+      } else if (interest === 'both') {
+        preferences.propertyTypes = [];
+        preferences.vehicleTypes = [];
+      }
+
+      const baseKycPath = '/uploads/kyc';
+      const newUser = new Merchants({
+        phoneNumber,
+        email,
+        password: passwordHash,
+        firstName: firstName || email.split('@')[0],
+        lastName: lastName || '',
+        fullName: `${firstName || email.split('@')[0]} ${lastName || ''}`.trim(),
+        role: 'seller',
+        interest: interest || 'property',
+        preferences,
+        city,
+        emailVerified: false,
+        phoneVerified: false,
+        verification: {
+          email: false,
+          phone: false,
+          identity: false,
+        },
+        sellerVerification: {
+          documentType: documentType === 'passport' ? 'passport' : 'cin',
+          identityFront: `${baseKycPath}/${identityFront.filename}`,
+          identityBack: `${baseKycPath}/${identityBack.filename}`,
+          faceVideo: `${baseKycPath}/${faceVideo.filename}`,
+          status: 'pending',
+          submittedAt: new Date(),
+        },
+      });
+
+      const user = await newUser.save();
+
+      let token = await Token.findOne({ userId: user._id });
+      if (!token) {
+        token = await new Token({
+          userId: user._id,
+          token: crypto.randomBytes(32).toString('hex'),
+        }).save();
+      }
+
+      const link = `${process.env.BASE_URL_EMAIL}/api/auth/email-verification?token=${token.token}`;
+      const templatePath = path.join(__dirname, './views/confirm.ejs');
+      const html = await ejs.renderFile(templatePath, {
+        name: email.split('@')[0],
+        newPath: link,
+      });
+
+      await SGmail.send({
+        to: email,
+        from: (process.env.SENDGRID_FROM_EMAIL || '').trim(),
+        subject: 'Verify Your Real Estate Account',
+        html,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: req.t('registrationSuccessEmail', email),
+        user: {
+          phoneVerified: false,
+          emailVerified: false,
+          _id: user._id,
+          sellerVerificationStatus: 'pending',
+        },
+      });
+    } catch (err) {
+      console.error('Seller KYC registration error:', err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || 'Server error during seller KYC registration',
+      });
+    }
+  },
   resendEmail: async (req, res, next) => {
     try {
       const regex = /\ /gi;
       const lastdata = req.query.scheme.replace(regex, "+");
 
-      var bytes = CryptoJS.AES.decrypt(lastdata, "secret key 1234567890");
+      var bytes = CryptoJS.AES.decrypt(lastdata, process.env.TOKEN_ENCRYPTION_KEY || "secret key 1234567890");
       var decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 
       const user = await Merchants.findById(decryptedData[0].userId);
@@ -363,7 +536,7 @@ const authCtrl = {
       if (user.emailVerified) {
         return res.status(403).json({
           success: false,
-          message: "User is already verified",
+          message: req.t('userAlreadyVerified'),
         });
       }
       let token = await Token.findOne({ userId: decryptedData[0].userId });
@@ -377,7 +550,7 @@ const authCtrl = {
 
       var ciphertext = CryptoJS.AES.encrypt(
         JSON.stringify(data),
-        "secret key 1234567890"
+        process.env.TOKEN_ENCRYPTION_KEY || "secret key 1234567890"
       )
         .toString()
         .replace(/\+/gi, "%2B");
@@ -391,7 +564,7 @@ const authCtrl = {
 
       const message = {
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL,
+        from: (process.env.SENDGRID_FROM_EMAIL || '').trim(),
         subject: "Email Activation",
         text: "Welcome abroad, please confirm your email address",
         html: emailTemplate,
@@ -405,7 +578,7 @@ const authCtrl = {
         } else {
           return res.status(200).json({
             success: true,
-            message: "Resend activation link successfully",
+            message: req.t('resendSuccess'),
           });
         }
       });
@@ -425,7 +598,7 @@ const authCtrl = {
         if (user_phone.phoneVerified) {
           return res.status(400).json({
             success: false,
-            message: "This phone is already verified !",
+            message: req.t('phoneAlreadyVerified'),
           });
         }
         client.verify.v2
@@ -439,7 +612,7 @@ const authCtrl = {
           });
         res.status(200).json({
           success: true,
-          message: "OTP is sent successfully !",
+          message: req.t('otpSent'),
         });
       }
     } catch (err) {
@@ -453,7 +626,7 @@ const authCtrl = {
     try {
       const regex = /\%2B/gi;
       const data = req.query.scheme.replace(regex, "+");
-      var bytes = CryptoJS.AES.decrypt(data, "secret key 1234567890");
+      var bytes = CryptoJS.AES.decrypt(data, process.env.TOKEN_ENCRYPTION_KEY || "secret key 1234567890");
       var decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
 
       const user = await Merchants.findById(decryptedData[0].userId);
@@ -509,25 +682,25 @@ const authCtrl = {
       if (!user_phone) {
         return res.status(404).json({
           success: false,
-          message: "User with that phone number does not exist!",
+          message: req.t('userWithPhoneNotFound'),
         });
       }
       if (code.length !== 6) {
         return res.status(405).json({
           success: false,
-          message: "Code should be 6 digits !",
+          message: req.t('otpCodeLength'),
         });
       }
       if (!phoneNumber) {
         return res.status(400).json({
           success: false,
-          message: "No phone number in request",
+          message: req.t('noPhoneInRequest'),
         });
       }
       if (!code) {
         return res.status(400).json({
           success: false,
-          message: "No code in request",
+          message: req.t('noCodeInRequest'),
         });
       }
       client.verify.v2
@@ -538,7 +711,7 @@ const authCtrl = {
           if (verification_check.valid === false) {
             return res.status(401).json({
               success: false,
-              message: "OTP is incorrect!",
+              message: req.t('otpIncorrect'),
             });
           }
           if (verification_check.status === "approved") {
@@ -551,13 +724,13 @@ const authCtrl = {
 
             res.status(200).json({
               success: true,
-              message: "Phone number is Verified !",
+              message: req.t('phoneVerified'),
               access_token,
             });
           } else {
             return res.status(500).json({
               success: false,
-              message: "Verification failed !",
+              message: req.t('verificationFailed'),
             });
           }
         })
@@ -565,13 +738,13 @@ const authCtrl = {
           console.log(error);
           return res.status(500).json({
             success: false,
-            message: "OTP is incorrect or expired",
+            message: req.t('otpIncorrectOrExpired'),
           });
         });
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "OTP is incorrect or expired",
+        message: req.t('otpIncorrectOrExpired'),
       });
     }
   },
@@ -583,19 +756,19 @@ const authCtrl = {
       if (!email || !password)
         return res.status(403).json({
           success: false,
-          message: "Not all fields have been entered",
+          message: req.t('missingFields'),
         });
       if (!validateEmail(email))
         return res.status(400).json({
           success: false,
-          message: "Invalid email",
+          message: req.t('invalidEmail'),
         });
       const user = await Merchants.findOne({ email }).populate("-password");
 
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "User not registred",
+          message: req.t('userNotRegistered'),
         });
       }
       if (!user.emailVerified) {
@@ -610,7 +783,7 @@ const authCtrl = {
 
         var ciphertext = CryptoJS.AES.encrypt(
           JSON.stringify(data),
-          "secret key 1234567890"
+          process.env.TOKEN_ENCRYPTION_KEY || "secret key 1234567890"
         )
           .toString()
           .replace(/\+/gi, "%2B");
@@ -622,7 +795,7 @@ const authCtrl = {
 
         const message = {
           to: email,
-          from: process.env.SENDGRID_FROM_EMAIL,
+          from: (process.env.SENDGRID_FROM_EMAIL || '').trim(),
           subject: "Email Activation",
           text: "Welcome abroad, please confirm your email address",
           html: emailTemplate,
@@ -630,8 +803,7 @@ const authCtrl = {
         const sent = await SGmail.send(message, (err, result) => {
           return res.status(401).json({
             success: false,
-            message:
-              "Your Email has not been verified yet. A new verification is sent !",
+            message: req.t('emailNotVerified'),
           });
         });
       }
@@ -639,17 +811,17 @@ const authCtrl = {
       if (!isMatch) {
         return res.status(402).json({
           success: false,
-          message: "Password is incorrect",
+          message: req.t('incorrectPassword'),
         });
       }
 
       const access_token = generateToken.createAccessToken({ id: user._id });
       console.log(access_token);
       user.save();
-      
+
       return res.status(200).json({
         success: true,
-        message: "LoggedIn successfully!",
+        message: req.t('loginSuccess'),
         access_token,
         user: {
           _id: user._id,
@@ -658,7 +830,7 @@ const authCtrl = {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
-          interest: user.interest || 'property', // Return interest field from user document
+          interest: user.interest || 'property',
           preferences: user.preferences,
         }
       });
@@ -676,12 +848,12 @@ const authCtrl = {
       if (!phoneNumber || !password)
         return res.status(403).json({
           success: false,
-          message: "Not all fields have been entered",
+          message: req.t('missingFields'),
         });
       if (!validator.isMobilePhone(phoneNumber)) {
         return res.status(400).json({
           success: false,
-          message: "Invalid phone number",
+          message: req.t('invalidPhoneNumber'),
         });
       }
 
@@ -691,14 +863,14 @@ const authCtrl = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "User not registred",
+          message: req.t('userNotRegistered'),
         });
       }
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
         return res.status(402).json({
           success: false,
-          message: "Password is incorrect",
+          message: req.t('incorrectPassword'),
         });
       }
       if (!user.phoneVerified) {
@@ -713,8 +885,7 @@ const authCtrl = {
           });
         return res.status(401).json({
           success: false,
-          message:
-            "Your Phone number has not been verified, a new OTP is sent !",
+          message: req.t('phoneNotVerified'),
         });
       }
 
@@ -722,10 +893,10 @@ const authCtrl = {
 
       user.online = true;
       user.save();
-      
+
       return res.status(200).json({
         success: true,
-        message: "LoggedIn successfully!",
+        message: req.t('loginSuccess'),
         access_token,
         user: {
           _id: user._id,
@@ -751,28 +922,28 @@ const authCtrl = {
   logout: async (req, res) => {
     try {
       const user = await Merchants.findOne({ _id: req.user._id });
-      
+
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "User not found",
+          message: req.t('userNotFound'),
         });
       }
-      
+
       if (user.online === false) {
         return res.status(400).json({
           success: false,
-          message: "Already logged out",
+          message: req.t('alreadyLoggedOut'),
         });
       }
-      
+
       user.online = false;
       await user.save();
       console.log("logged out successfully", user);
-      
+
       return res.status(200).json({
         success: true,
-        message: "Logged out Successfully.",
+        message: req.t('logoutSuccess'),
       });
     } catch (err) {
       return res.status(500).json({
@@ -790,7 +961,7 @@ const authCtrl = {
       if (!email) {
         return res.status(400).json({
           success: false,
-          message: "Email is required",
+          message: req.t('emailRequired'),
         });
       }
 
@@ -799,7 +970,7 @@ const authCtrl = {
       if (!emailRegex.test(email)) {
         return res.status(400).json({
           success: false,
-          message: "Please provide a valid email address",
+          message: req.t('validEmailRequired'),
         });
       }
 
@@ -808,7 +979,7 @@ const authCtrl = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "No account found with this email address",
+          message: req.t('noAccountWithEmail'),
         });
       }
 
@@ -832,7 +1003,7 @@ const authCtrl = {
         console.error("Template rendering error:", templateError);
         return res.status(500).json({
           success: false,
-          message: "Failed to generate email template",
+          message: req.t('failedToGenerateTemplate'),
         });
       }
 
@@ -857,13 +1028,13 @@ const authCtrl = {
 
         return res.status(500).json({
           success: false,
-          message: "Failed to send email. Please try again.",
+          message: req.t('failedToSendEmail'),
         });
       }
 
       return res.status(200).json({
         success: true,
-        message: "Password reset code sent to your email address",
+        message: req.t('passwordResetEmailSent'),
         data: {
           email: email.toLowerCase(),
           expiresIn: "15 minutes",
@@ -873,7 +1044,7 @@ const authCtrl = {
       console.error("Error in forgotPasswordEmail:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error. Please try again later.",
+        message: req.t('internalServerError'),
       });
     }
   },
@@ -891,7 +1062,7 @@ const authCtrl = {
       if (!email || !otp || !newPassword) {
         return res.status(400).json({
           success: false,
-          message: "Email, verification code, and new password are required",
+          message: req.t('emailOtpAndPasswordRequired'),
         });
       }
 
@@ -900,7 +1071,7 @@ const authCtrl = {
       if (!emailRegex.test(email)) {
         return res.status(400).json({
           success: false,
-          message: "Please provide a valid email address",
+          message: req.t('validEmailRequired'),
         });
       }
 
@@ -908,7 +1079,7 @@ const authCtrl = {
       if (!/^\d{6}$/.test(otp)) {
         return res.status(400).json({
           success: false,
-          message: "Verification code must be 6 digits",
+          message: req.t('verificationCodeSixDigits'),
         });
       }
 
@@ -916,7 +1087,7 @@ const authCtrl = {
       if (newPassword.length < 8) {
         return res.status(400).json({
           success: false,
-          message: "Password must be at least 8 characters long",
+          message: req.t('passwordTooShort'),
         });
       }
 
@@ -925,7 +1096,7 @@ const authCtrl = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "No account found with this email address",
+          message: req.t('noAccountWithEmail'),
         });
       }
 
@@ -933,14 +1104,14 @@ const authCtrl = {
       if (!user.latestOtp || user.latestOtp !== otp) {
         return res.status(400).json({
           success: false,
-          message: "Invalid verification code",
+          message: req.t('invalidVerificationCode'),
         });
       }
 
       if (!user.latestOtp) {
         return res.status(400).json({
           success: false,
-          message: "Verification code has expired. Please request a new one.",
+          message: req.t('verificationCodeExpired'),
         });
       }
 
@@ -956,13 +1127,13 @@ const authCtrl = {
 
       return res.status(200).json({
         success: true,
-        message: "Password has been reset successfully",
+        message: req.t('passwordResetSuccess'),
       });
     } catch (error) {
       console.error("Error in resetPasswordEmail:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error. Please try again later.",
+        message: req.t('internalServerError'),
       });
     }
   },
@@ -974,7 +1145,7 @@ const authCtrl = {
       if (!phoneNumber) {
         return res.status(400).json({
           success: false,
-          message: "Phone number is required",
+          message: req.t('phoneRequired'),
         });
       }
 
@@ -984,7 +1155,7 @@ const authCtrl = {
       if (!phoneRegex.test(cleanPhoneNumber)) {
         return res.status(400).json({
           success: false,
-          message: "Please provide a valid phone number",
+          message: req.t('validPhoneRequired'),
         });
       }
 
@@ -992,7 +1163,7 @@ const authCtrl = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "No account found with this phone number",
+          message: req.t('noAccountWithPhone'),
         });
       }
 
@@ -1013,7 +1184,7 @@ const authCtrl = {
 
         return res.status(200).json({
           success: true,
-          message: "Reset code sent to your phone number",
+          message: req.t('resetCodeSentToPhone'),
           data: {
             phoneNumber: phoneNumber,
             status: verification.status,
@@ -1025,27 +1196,27 @@ const authCtrl = {
         if (twilioError.code === 21211) {
           return res.status(400).json({
             success: false,
-            message: "Invalid phone number format",
+            message: req.t('invalidPhoneFormat'),
           });
         }
 
         if (twilioError.code === 21608) {
           return res.status(400).json({
             success: false,
-            message: "Phone number is not a valid mobile number",
+            message: req.t('phoneNotMobile'),
           });
         }
 
         return res.status(500).json({
           success: false,
-          message: "Failed to send SMS. Please try again.",
+          message: req.t('failedToSendSms'),
         });
       }
     } catch (error) {
       console.error("Error in forgotPasswordPhone:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error. Please try again later.",
+        message: req.t('internalServerError'),
       });
     }
   },
@@ -1058,8 +1229,7 @@ const authCtrl = {
       if (!code || !phoneNumber || !newPassword) {
         return res.status(400).json({
           success: false,
-          message:
-            "Verification code, phone number, and new password are required",
+          message: req.t('codePhonePasswordRequired'),
         });
       }
 
@@ -1067,7 +1237,7 @@ const authCtrl = {
       if (!/^\d{6}$/.test(code)) {
         return res.status(400).json({
           success: false,
-          message: "Verification code must be 6 digits",
+          message: req.t('verificationCodeSixDigits'),
         });
       }
 
@@ -1075,7 +1245,7 @@ const authCtrl = {
       if (newPassword.length < 8) {
         return res.status(400).json({
           success: false,
-          message: "Password must be at least 8 characters long",
+          message: req.t('passwordTooShort'),
         });
       }
 
@@ -1084,7 +1254,7 @@ const authCtrl = {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: "No account found with this phone number",
+          message: req.t('noAccountWithPhone'),
         });
       }
 
@@ -1107,7 +1277,7 @@ const authCtrl = {
         if (verificationCheck.status !== "approved") {
           return res.status(400).json({
             success: false,
-            message: "Invalid or expired verification code",
+            message: req.t('invalidOrExpiredCode'),
           });
         }
 
@@ -1123,7 +1293,7 @@ const authCtrl = {
 
         return res.status(200).json({
           success: true,
-          message: "Password has been reset successfully",
+          message: req.t('passwordResetSuccess'),
         });
       } catch (twilioError) {
         console.error("Twilio verification error:", twilioError);
@@ -1132,27 +1302,27 @@ const authCtrl = {
         if (twilioError.status === 404 && twilioError.code === 20404) {
           return res.status(400).json({
             success: false,
-            message: "Invalid or expired verification code",
+            message: req.t('invalidOrExpiredCode'),
           });
         }
 
         if (twilioError.code === 60202) {
           return res.status(400).json({
             success: false,
-            message: "Verification code has expired. Please request a new one.",
+            message: req.t('verificationCodeExpired'),
           });
         }
 
         return res.status(500).json({
           success: false,
-          message: "Failed to verify code. Please try again.",
+          message: req.t('failedToVerifyCode'),
         });
       }
     } catch (error) {
       console.error("Error in resetPasswordPhone:", error);
       return res.status(500).json({
         success: false,
-        message: "Internal server error. Please try again later.",
+        message: req.t('internalServerError'),
       });
     }
   },
