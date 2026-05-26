@@ -270,9 +270,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontFamily: Typography.fontFamily.medium,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   filterText: {
     fontSize: 16,

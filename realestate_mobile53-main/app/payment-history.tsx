@@ -217,9 +217,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F7F7",
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: "700",
-    color: Colors.textPrimary,
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   headerSpacer: {
     width: 40,

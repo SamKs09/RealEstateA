@@ -328,3 +328,18 @@ export const deleteVehicle = async (
   }
 };
 
+/**
+ * Archive vehicle (set status to archived)
+ */
+export const archiveVehicle = async (
+  vehicleId: string
+): Promise<{ success: boolean }> => {
+  try {
+    const response = await apiService.patch<Vehicle>(`/vehicles/${vehicleId}`, { status: 'archived' });
+    return { success: response.success };
+  } catch (error: any) {
+    console.error("❌ Error archiving vehicle:", error);
+    throw error;
+  }
+};
+

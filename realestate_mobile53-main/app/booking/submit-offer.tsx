@@ -365,9 +365,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: "raleway-600SemiBold",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
     color: "#333333",
   },
   placeholder: {

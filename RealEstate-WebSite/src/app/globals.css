@@ -71,10 +71,10 @@
   --radius-full: 9999px;
 
   /* ── Font Families ── */
-  --font-headline: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
-  --font-body: "Raleway", sans-serif;
-  --font-label: var(--font-manrope), "Manrope", sans-serif;
-  --font-stats: var(--font-comfortaa), "Comfortaa", sans-serif;
+  --font-headline: var(--font-raleway), "Raleway", sans-serif;
+  --font-body: var(--font-raleway), "Raleway", sans-serif;
+  --font-label: var(--font-raleway), "Raleway", sans-serif;
+  --font-stats: var(--font-raleway), "Raleway", sans-serif;
 }
 
 /* ── Base ── */

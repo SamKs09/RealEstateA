@@ -156,11 +156,29 @@ class AuthService {
   async initializeAuth(): Promise<User | null> {
     try {
       const token = await this.getStoredToken();
-      if (token) {
-        apiService.setAuthToken(token);
-        return await this.getStoredUser();
+      if (!token) return null;
+
+      apiService.setAuthToken(token);
+
+      // Fetch fresh profile from the server so pack/boost/listingConfig are
+      // always up-to-date even if the payment webhook ran after last login.
+      try {
+        const response = await apiService.get<User>('/user/profile');
+        const freshUser: User | null =
+          response.success && response.data
+            ? response.data
+            : (response.success && (response as any).user) || null;
+
+        if (freshUser) {
+          await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(freshUser));
+          return freshUser;
+        }
+      } catch (networkError) {
+        console.warn('Could not refresh profile on startup, using cached user:', networkError);
       }
-      return null;
+
+      // Fallback: use locally cached user (e.g. when offline)
+      return await this.getStoredUser();
     } catch (error) {
       console.error('Error initializing auth:', error);
       return null;

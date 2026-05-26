@@ -112,10 +112,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#FF8C42",
-    fontFamily: "raleway-700Bold",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   lastUpdated: {
     fontSize: 12,

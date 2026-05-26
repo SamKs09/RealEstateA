@@ -301,9 +301,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#FF8C42", // orange
-    fontFamily: "raleway-700Bold",
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   headerActions: {
     flexDirection: "row",

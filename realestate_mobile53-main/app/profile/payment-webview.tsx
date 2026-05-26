@@ -147,9 +147,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    fontFamily: "raleway-700Bold",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
 });

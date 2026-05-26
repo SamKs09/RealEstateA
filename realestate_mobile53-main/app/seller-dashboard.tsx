@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,17 +17,18 @@ import { useAuth } from "../contexts/AuthContext";
 import { useInterest } from "../contexts/InterestContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { HeaderWithBackButton } from "../components/Ui/HeaderWithBackButton";
-import { getMyListings, Property } from "../services/propertyService";
+import { getMyListings, archiveProperty, Property } from "../services/propertyService";
 import * as vehicleService from "../services/vehicleService";
+import { archiveVehicle } from "../services/vehicleService";
+import { getOwnerBookings, BookingData } from "../services/bookingService";
 import { getFullImageUrl } from "../services/api";
 
-type ListingStatus = "all" | "active" | "pending" | "sold";
+type ListingStatus = "all" | "active" | "pending";
 
 interface ListingStats {
   total: number;
   active: number;
   pending: number;
-  sold: number;
 }
 
 export default function SellerDashboardScreen() {
@@ -38,57 +40,75 @@ export default function SellerDashboardScreen() {
   const [activeTab, setActiveTab] = useState<ListingStatus>("all");
   const [properties, setProperties] = useState<Property[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const [ownerBookings, setOwnerBookings] = useState<BookingData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<ListingStats>({
     total: 0,
     active: 0,
     pending: 0,
-    sold: 0,
   });
 
   // Determine display mode
   const displayMode = isBothMode ? activeView : userInterest;
 
+  const isBookedToday = useCallback((listingId: string): boolean => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    return ownerBookings.some((b) => {
+      if (b.status !== "accepted") return false;
+      const refId =
+        displayMode === "cars"
+          ? b.vehicle?._id || b.vehicle?.id
+          : b.property?._id || b.property?.id;
+      if (refId !== listingId) return false;
+      const start = new Date(b.startDate);
+      const end = new Date(b.endDate);
+      end.setHours(23, 59, 59, 999);
+      return today >= start && today <= end;
+    });
+  }, [ownerBookings, displayMode]);
+
   const fetchListings = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+      const userId = (user as any)?._id || (user as any)?.id;
+      const bookingsPromise = userId
+        ? getOwnerBookings(userId).catch(() => [] as BookingData[])
+        : Promise.resolve<BookingData[]>([]);
+
       if (displayMode === "cars") {
-        const response = await vehicleService.getUserVehicles({
-          page: 1,
-          limit: 100,
-        });
+        const [response, bookings] = await Promise.all([
+          vehicleService.getUserVehicles({ page: 1, limit: 100 }),
+          bookingsPromise,
+        ]);
         const vehicleData = response.data || [];
         setVehicles(vehicleData);
-        
-        // Calculate stats for vehicles
-        const vehicleStats = {
+        setOwnerBookings(bookings);
+        setStats({
           total: vehicleData.length,
-          active: vehicleData.filter((v: any) => v.status === "active").length,
-          pending: vehicleData.filter((v: any) => v.status === "pending").length,
-          sold: vehicleData.filter((v: any) => v.status === "sold").length,
-        };
-        setStats(vehicleStats);
+          active: vehicleData.filter((v: any) => v.isPromoted === true).length,
+          pending: 0, // recalculated after bookings load
+        });
       } else {
-        const propertyData = await getMyListings();
+        const [propertyData, bookings] = await Promise.all([
+          getMyListings(),
+          bookingsPromise,
+        ]);
         setProperties(propertyData);
-        
-        // Calculate stats for properties
-        const propertyStats = {
+        setOwnerBookings(bookings);
+        setStats({
           total: propertyData.length,
-          active: propertyData.filter((p: any) => p.status === "active").length,
-          pending: propertyData.filter((p: any) => p.status === "pending").length,
-          sold: propertyData.filter((p: any) => p.status === "sold").length,
-        };
-        setStats(propertyStats);
+          active: propertyData.filter((p: any) => p.isPromoted === true).length,
+          pending: 0,
+        });
       }
     } catch (error) {
       console.error("Error fetching listings:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [displayMode]);
+  }, [displayMode, user]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -102,36 +122,72 @@ export default function SellerDashboardScreen() {
     }, [fetchListings])
   );
 
+  const allListings = displayMode === "cars" ? vehicles : properties;
+
+  const archivedCount = useMemo(
+    () => allListings.filter((item: any) => item.status === "archived").length,
+    [allListings]
+  );
+
+  // Keep stats.pending in sync
+  const displayStats = useMemo(() => ({
+    ...stats,
+    pending: archivedCount,
+  }), [stats, archivedCount]);
+
   const getFilteredListings = () => {
-    const listings = displayMode === "cars" ? vehicles : properties;
-    
-    if (activeTab === "all") return listings;
-    return listings.filter((item: any) => item.status === activeTab);
+    if (activeTab === "all") return allListings.filter((item: any) => item.status !== "archived");
+    if (activeTab === "active") return allListings.filter((item: any) => item.isPromoted === true && item.status !== "archived");
+    if (activeTab === "pending") return allListings.filter((item: any) => item.status === "archived");
+    return allListings;
+  };
+
+  const handleArchive = (id: string, title: string) => {
+    Alert.alert(
+      t('sellerDashboard.archiveTitle'),
+      t('sellerDashboard.archiveConfirm', { title }),
+      [
+        { text: t('sellerDashboard.cancel'), style: "cancel" },
+        {
+          text: t('sellerDashboard.archiveButton'),
+          onPress: async () => {
+            try {
+              if (displayMode === "cars") {
+                await archiveVehicle(id);
+              } else {
+                await archiveProperty(id);
+              }
+              fetchListings();
+            } catch {
+              Alert.alert("Error", t('sellerDashboard.archiveFailed'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-        return "#4CAF50";
-      case "pending":
-        return "#FF9800";
-      case "sold":
-        return "#9E9E9E";
-      default:
-        return "#4CAF50";
+      case "active":   return "#4CAF50";
+      case "inactive": return "#FF9800";
+      case "pending":  return "#FF9800";
+      case "sold":     return "#9E9E9E";
+      case "rented":   return "#007AFF";
+      case "archived": return "#8E8E93";
+      default:         return "#4CAF50";
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "active":
-        return "Active";
-      case "pending":
-        return "Pending";
-      case "sold":
-        return "Sold";
-      default:
-        return "Active";
+      case "active":   return t('sellerDashboard.statusActive');
+      case "inactive": return t('sellerDashboard.statusInactive');
+      case "pending":  return t('sellerDashboard.statusPending');
+      case "sold":     return t('sellerDashboard.statusSold');
+      case "rented":   return t('sellerDashboard.statusRented');
+      case "archived": return t('sellerDashboard.statusArchived');
+      default:         return t('sellerDashboard.statusActive');
     }
   };
 
@@ -208,8 +264,8 @@ export default function SellerDashboardScreen() {
             </View>
             
             <Text style={styles.priceText}>
-              {price ? `${price.toLocaleString()} DT` : "Price on request"}
-              {item.listingType === "rent" && " /month"}
+              {price ? `${price.toLocaleString()} DT` : t('sellerDashboard.priceOnRequest')}
+              {item.listingType === "rent" && t('sellerDashboard.perMonth')}
             </Text>
           </View>
         </TouchableOpacity>
@@ -242,6 +298,13 @@ export default function SellerDashboardScreen() {
           >
             <Ionicons name="stats-chart" size={20} color="#FF6B35" />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.archiveButton}
+            onPress={() => handleArchive(itemId, itemTitle)}
+          >
+            <Ionicons name="archive-outline" size={18} color="#8E8E93" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -251,12 +314,12 @@ export default function SellerDashboardScreen() {
     return (
       <View style={styles.container}>
         <HeaderWithBackButton 
-          title="My Listings"
+          title={t('sellerDashboard.title')}
           onBackPress={() => router.back()} 
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B35" />
-          <Text style={styles.loadingText}>Loading your listings...</Text>
+          <Text style={styles.loadingText}>{t('sellerDashboard.loading')}</Text>
         </View>
       </View>
     );
@@ -265,7 +328,7 @@ export default function SellerDashboardScreen() {
   return (
     <View style={styles.container}>
       <HeaderWithBackButton 
-        title="My Listings"
+        title={t('sellerDashboard.title')}
         onBackPress={() => router.back()} 
       />
       
@@ -276,20 +339,68 @@ export default function SellerDashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.boostBanner}>
-          <Text style={styles.boostBannerLabel}>Boosts remaining</Text>
-          <Text style={styles.boostBannerValue}>{user?.boost?.number ?? 0}</Text>
-          <Text style={styles.boostBannerMeta}>
-            Pack: {user?.pack || "freemium"} · Slots: {user?.listingConfig?.number || 1}
-          </Text>
+        {/* Promo / motivational banner */}
+        <View style={styles.promoBanner}>
+          <View style={styles.promoTopRow}>
+            <View style={styles.promoTextBlock}>
+              <Text style={styles.promoHeadline}>{t('sellerDashboard.promoHeadline')}</Text>
+              <Text style={styles.promoSub}>
+                {t('sellerDashboard.promoSub')}{" "}
+                <Text style={styles.promoHighlight}>{t('sellerDashboard.promoHighlight')}</Text>{" "}{t('sellerDashboard.promoSubEnd')}
+              </Text>
+            </View>
+            <View style={styles.promoRocketWrap}>
+              <Ionicons name="rocket" size={36} color="#FF6B35" />
+            </View>
+          </View>
+
+          <View style={styles.promoStatsRow}>
+            <View style={styles.promoStat}>
+              <Text style={styles.promoStatValue}>{user?.boost?.number ?? 0}</Text>
+              <Text style={styles.promoStatLabel}>{t('sellerDashboard.boostsLeft')}</Text>
+            </View>
+            <View style={styles.promoStatDivider} />
+            <View style={styles.promoStat}>
+              <Text style={styles.promoStatValue}>
+                {(user?.pack || "freemium").charAt(0).toUpperCase() +
+                  (user?.pack || "freemium").slice(1)}
+              </Text>
+              <Text style={styles.promoStatLabel}>{t('sellerDashboard.currentPlan')}</Text>
+            </View>
+            <View style={styles.promoStatDivider} />
+            <View style={styles.promoStat}>
+              <Text style={styles.promoStatValue}>
+                {user?.listingConfig?.number || 1}
+              </Text>
+              <Text style={styles.promoStatLabel}>{t('sellerDashboard.listingSlots')}</Text>
+            </View>
+          </View>
+
+          <View style={styles.promoCTARow}>
+            <TouchableOpacity
+              style={styles.promoCTAPrimary}
+              onPress={() => router.push("/free-trial" as any)}
+            >
+              <Ionicons name="star-outline" size={15} color="#fff" />
+              <Text style={styles.promoCTAPrimaryText}>{t('sellerDashboard.upgradePlan')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(user?.boost?.number ?? 0) === 0 && (
+            <View style={styles.promoNudge}>
+              <Ionicons name="information-circle-outline" size={14} color="#FF6B35" />
+              <Text style={styles.promoNudgeText}>
+                {t('sellerDashboard.noBoostsNudge')}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          {renderStatsCard("Total", stats.total, activeTab === "all")}
-          {renderStatsCard("Active", stats.active, activeTab === "active")}
-          {renderStatsCard("Pending", stats.pending, activeTab === "pending")}
-          {renderStatsCard("Sold", stats.sold, activeTab === "sold")}
+          {renderStatsCard(t('sellerDashboard.statTotal'), displayStats.total, activeTab === "all")}
+          {renderStatsCard(t('sellerDashboard.statBoosted'), displayStats.active, activeTab === "active")}
+          {renderStatsCard(t('sellerDashboard.statArchived'), displayStats.pending, activeTab === "pending")}
         </View>
 
         {/* Filter Tabs */}
@@ -299,7 +410,7 @@ export default function SellerDashboardScreen() {
             onPress={() => setActiveTab("all")}
           >
             <Text style={[styles.tabText, activeTab === "all" && styles.activeTabText]}>
-              All
+              {t('sellerDashboard.tabAll')}
             </Text>
           </TouchableOpacity>
           
@@ -308,7 +419,7 @@ export default function SellerDashboardScreen() {
             onPress={() => setActiveTab("active")}
           >
             <Text style={[styles.tabText, activeTab === "active" && styles.activeTabText]}>
-              Active
+              {t('sellerDashboard.tabBoosted')}
             </Text>
           </TouchableOpacity>
           
@@ -317,16 +428,7 @@ export default function SellerDashboardScreen() {
             onPress={() => setActiveTab("pending")}
           >
             <Text style={[styles.tabText, activeTab === "pending" && styles.activeTabText]}>
-              Pending
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "sold" && styles.activeTab]}
-            onPress={() => setActiveTab("sold")}
-          >
-            <Text style={[styles.tabText, activeTab === "sold" && styles.activeTabText]}>
-              Sold
+              {t('sellerDashboard.tabArchived')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -341,12 +443,14 @@ export default function SellerDashboardScreen() {
                 color="#E0E0E0" 
               />
               <Text style={styles.emptyTitle}>
-                No {activeTab === "all" ? "" : activeTab} listings yet
+                {activeTab === "all" ? t('sellerDashboard.noListings') : activeTab === "active" ? t('sellerDashboard.noBoostedListings') : t('sellerDashboard.noArchivedListings')}
               </Text>
               <Text style={styles.emptySubtitle}>
-                {displayMode === "cars" 
-                  ? "Start by adding your first vehicle listing"
-                  : "Start by adding your first property listing"}
+                {activeTab === "pending"
+                  ? t('sellerDashboard.archivedWillAppear')
+                  : displayMode === "cars"
+                  ? t('sellerDashboard.addFirstVehicle')
+                  : t('sellerDashboard.addFirstProperty')}
               </Text>
               <TouchableOpacity
                 style={styles.addButton}
@@ -359,7 +463,7 @@ export default function SellerDashboardScreen() {
                 }}
               >
                 <Text style={styles.addButtonText}>
-                  Add {displayMode === "cars" ? "Vehicle" : "Property"}
+                  {displayMode === "cars" ? t('sellerDashboard.addVehicle') : t('sellerDashboard.addProperty')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -392,32 +496,130 @@ const styles = StyleSheet.create({
     color: "#666",
     fontFamily: "raleway-400Regular",
   },
-  boostBanner: {
-    marginHorizontal: 20,
-    marginTop: 18,
-    borderRadius: 16,
-    padding: 16,
+  promoBanner: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 18,
     backgroundColor: "#FFF5EC",
     borderWidth: 1,
     borderColor: "#FFD7BD",
   },
-  boostBannerLabel: {
-    fontSize: 12,
-    color: "#8A8A8A",
-    marginBottom: 4,
-    fontFamily: "raleway-500Medium",
+  promoTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 14,
   },
-  boostBannerValue: {
-    fontSize: 28,
+  promoTextBlock: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  promoHeadline: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    fontFamily: "raleway-700Bold",
+    marginBottom: 4,
+  },
+  promoSub: {
+    fontSize: 13,
+    color: "#555",
+    fontFamily: "raleway-400Regular",
+    lineHeight: 18,
+  },
+  promoHighlight: {
+    color: "#FF6B35",
+    fontFamily: "raleway-700Bold",
+  },
+  promoRocketWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFE8D6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  promoStatsRow: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  promoStat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  promoStatDivider: {
+    width: 1,
+    backgroundColor: "#F0E8E0",
+  },
+  promoStatValue: {
+    fontSize: 18,
     fontWeight: "700",
     color: "#FF6B35",
     fontFamily: "raleway-700Bold",
   },
-  boostBannerMeta: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#666",
+  promoStatLabel: {
+    fontSize: 11,
+    color: "#8A8A8A",
     fontFamily: "raleway-400Regular",
+    marginTop: 2,
+  },
+  promoCTARow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  promoCTAPrimary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#FF6B35",
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  promoCTAPrimaryText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "raleway-600SemiBold",
+  },
+  promoCTASecondary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#fff",
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#FF6B35",
+  },
+  promoCTASecondaryText: {
+    color: "#FF6B35",
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "raleway-600SemiBold",
+  },
+  promoNudge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: "#FFE8D6",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  promoNudgeText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#CC4A10",
+    fontFamily: "raleway-400Regular",
+    lineHeight: 16,
   },
   statsContainer: {
     flexDirection: "row",
@@ -561,6 +763,14 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: "#FFF5F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  archiveButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F2F2F7",
     alignItems: "center",
     justifyContent: "center",
   },

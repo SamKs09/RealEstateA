@@ -237,10 +237,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
     color: "#333333",
-    fontFamily: "raleway-600SemiBold",
   },
   loadingContainer: {
     flex: 1,

@@ -81,6 +81,7 @@ export default function BoostListingScreen() {
   const [listing, setListing] = useState<Property | Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [boosting, setBoosting] = useState(false);
+  const [boostingMode, setBoostingMode] = useState<"pack" | "pay" | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<BoostPlanKey>("7day");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [confirmingTransactionId, setConfirmingTransactionId] = useState<
@@ -195,33 +196,42 @@ export default function BoostListingScreen() {
     router,
   ]);
 
-  const handleBoost = async () => {
+  const handlePackBoost = async () => {
     if (!listingId) return;
-
-    const hasPackBoosts = (user?.boost?.number ?? 0) > 0;
-
     try {
       setBoosting(true);
-
-      if (hasPackBoosts) {
-        const result = isVehicle
-          ? await boostVehicle(listingId, selectedPlan)
-          : await boostProperty(listingId, selectedPlan);
-        if (result?.user) {
-          await updateUser(result.user);
-        }
-        setShowSuccessModal(true);
-        return;
+      setBoostingMode("pack");
+      const result = isVehicle
+        ? await boostVehicle(listingId, selectedPlan)
+        : await boostProperty(listingId, selectedPlan);
+      if (result?.user) {
+        await updateUser(result.user);
       }
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error("Error boosting listing:", error);
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to boost listing. Please try again.";
+      Alert.alert("Boost Failed", message);
+    } finally {
+      setBoosting(false);
+      setBoostingMode(null);
+    }
+  };
 
+  const handlePayBoost = async () => {
+    if (!listingId) return;
+    try {
+      setBoosting(true);
+      setBoostingMode("pay");
       const checkout = isVehicle
         ? await initiateVehicleBoostPayment(listingId, selectedPlan)
         : await initiatePropertyBoostPayment(listingId, selectedPlan);
-
       if (!checkout?.checkoutUrl || !checkout.transactionId) {
         throw new Error("Failed to start boost payment.");
       }
-
       router.push({
         pathname: "/profile/payment-webview",
         params: {
@@ -236,10 +246,11 @@ export default function BoostListingScreen() {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to boost listing. Please try again.";
+        "Failed to start boost payment. Please try again.";
       Alert.alert("Boost Failed", message);
     } finally {
       setBoosting(false);
+      setBoostingMode(null);
     }
   };
 
@@ -295,6 +306,17 @@ export default function BoostListingScreen() {
   const remainingBoosts = user?.boost?.number ?? 0;
   const usesPackBoost = remainingBoosts > 0;
 
+  const daysRemaining = listing?.promotionExpiry
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(listing.promotionExpiry).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+    : 0;
+  const isAlreadyBoosted = !!(listing?.isPromoted && daysRemaining > 0);
+
   return (
     <View style={styles.container}>
       <HeaderWithBackButton
@@ -307,12 +329,44 @@ export default function BoostListingScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Active boost status banner */}
+        {isAlreadyBoosted && (
+          <View style={styles.activeBoostBanner}>
+            <View style={styles.activeBoostRow}>
+              <Ionicons name="flash" size={16} color="#34C759" />
+              <Text style={styles.activeBoostTitle}>Active boost</Text>
+              <View style={styles.activeBoostDaysBadge}>
+                <Text style={styles.activeBoostDaysText}>
+                  {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left
+                </Text>
+              </View>
+            </View>
+            {(listing as Vehicle | Property & { boostPlan?: string })?.boostPlan && (
+              <Text style={styles.activeBoostPlan}>
+                {(listing as any).boostPlan === "1day"
+                  ? "1 day boost"
+                  : (listing as any).boostPlan === "3day"
+                    ? "3 day boost"
+                    : "7 day boost"}
+                {" · "}
+                Expires{" "}
+                {new Date(listing!.promotionExpiry!).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </Text>
+            )}
+          </View>
+        )}
+
         <View style={styles.remainingBoostBanner}>
           <View>
             <Text style={styles.remainingBoostLabel}>Boosts remaining</Text>
             <Text style={styles.remainingBoostHint}>
               {usesPackBoost
-                ? "This boost will use your current pack credit."
+                ? isAlreadyBoosted
+                  ? "A new boost will replace the active one."
+                  : "This boost will use your current pack credit."
                 : "No pack boosts left. You can still pay for a standalone boost."}
             </Text>
           </View>
@@ -406,8 +460,8 @@ export default function BoostListingScreen() {
           </View>
         </View>
 
-        {/* Pending offers section */}
-        <Text style={styles.sectionLabel}>Pending offers</Text>
+        {/* Purchase a boost section */}
+        <Text style={styles.sectionLabel}>Purchase a boost</Text>
 
         {/* Boost Plan Cards */}
         {BOOST_PLANS.map((plan) => {
@@ -459,17 +513,37 @@ export default function BoostListingScreen() {
         </View>
       </ScrollView>
 
-      {/* Boost Now Button */}
+      {/* Action Buttons */}
       <View style={styles.bottomSection}>
+        {remainingBoosts > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.packBoostBtn,
+              (boosting || confirmingTransactionId !== null) && styles.packBoostBtnDisabled,
+            ]}
+            onPress={handlePackBoost}
+            disabled={boosting || confirmingTransactionId !== null}
+            activeOpacity={0.8}
+          >
+            {boosting && boostingMode === "pack" ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="flash" size={18} color="#fff" />
+            )}
+            <Text style={styles.packBoostBtnText}>
+              {isAlreadyBoosted
+                ? `Replace boost · ${remainingBoosts} credit${remainingBoosts !== 1 ? "s" : ""} left`
+                : `Use pack boost · ${remainingBoosts} remaining`}
+            </Text>
+          </TouchableOpacity>
+        )}
         <PrimaryButton
           title={
-            boosting
+            boosting && boostingMode === "pay"
               ? "Processing..."
-              : usesPackBoost
-                ? "Use pack boost"
-                : "Pay and boost now"
+              : `Pay and boost · ${planData.price}DT`
           }
-          onPress={handleBoost}
+          onPress={handlePayBoost}
           disabled={boosting || confirmingTransactionId !== null}
         />
       </View>
@@ -507,6 +581,45 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
     paddingTop: 10,
   },
+  // Active Boost Banner
+  activeBoostBanner: {
+    backgroundColor: "#F0FFF4",
+    borderWidth: 1.5,
+    borderColor: "#34C759",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  activeBoostRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  activeBoostTitle: {
+    fontSize: 14,
+    fontFamily: "Raleway-Bold",
+    color: "#1A7A36",
+    flex: 1,
+  },
+  activeBoostDaysBadge: {
+    backgroundColor: "#34C759",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  activeBoostDaysText: {
+    fontSize: 12,
+    fontFamily: "Raleway-Bold",
+    color: "#fff",
+  },
+  activeBoostPlan: {
+    fontSize: 12,
+    fontFamily: "Raleway",
+    color: "#2E7D32",
+    marginTop: 2,
+  },
+
   remainingBoostBanner: {
     backgroundColor: "#FFF5EC",
     borderRadius: 14,
@@ -695,5 +808,23 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingBottom: Platform.OS === "ios" ? 36 : 20,
     backgroundColor: "#FFFFFF",
+    gap: 12,
+  },
+  packBoostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+  },
+  packBoostBtnDisabled: {
+    opacity: 0.5,
+  },
+  packBoostBtnText: {
+    fontSize: 15,
+    fontFamily: "Raleway-Bold",
+    color: "#fff",
   },
 });

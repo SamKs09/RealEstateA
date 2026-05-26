@@ -11,15 +11,17 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   Image,
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import {
-  BottomSheet,
-  BottomSheetModalMethods,
-} from "../../components/Ui/BottomSheet";
+  BottomSheetModal,
+  BottomSheetFlatList,
+  BottomSheetBackdrop,
+  BottomSheetBackdropProps,
+} from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -453,7 +455,14 @@ export default function ExploreScreen() {
     };
   }, [fetchUnreadCount, loadNotificationPreferences]);
 
-  const locationBottomSheetRef = useRef<BottomSheetModalMethods>(null);
+  const locationBottomSheetRef = useRef<BottomSheetModal>(null);
+  const locationSnapPoints = useMemo(() => ["60%"], []);
+  const renderLocationBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.4} />
+    ),
+    []
+  );
 
   // All 24 Tunisian Governorates (translated)
   const tunisianStates = useMemo(
@@ -879,16 +888,20 @@ export default function ExploreScreen() {
                   activeOpacity={0.85}
                 >
                   <Image source={story.image} style={styles.storyCardImage} />
-                  <View style={styles.storyCardOverlay} />
-
-                  <View style={styles.storyContent}>
-                    <Text style={styles.storyTitle} numberOfLines={2}>
-                      {story.title}
-                    </Text>
-                    <Text style={styles.storySubtitle} numberOfLines={1}>
-                      {story.subtitle || t("explore.promotedFallback")}
-                    </Text>
-                  </View>
+                  <BlurView
+                    intensity={55}
+                    tint="dark"
+                    style={styles.storyGlassPanel}
+                  >
+                    <View style={styles.storyGlassPanelInner}>
+                      <Text style={styles.storyTitle} numberOfLines={2}>
+                        {story.title}
+                      </Text>
+                      <Text style={styles.storySubtitle} numberOfLines={1}>
+                        {story.subtitle || t("explore.promotedFallback")}
+                      </Text>
+                    </View>
+                  </BlurView>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -1038,12 +1051,21 @@ export default function ExploreScreen() {
       </ScrollView>
 
       {/* Location Selection Bottom Sheet */}
-      <BottomSheet
+      <BottomSheetModal
         ref={locationBottomSheetRef}
-        title={t("explore.selectLocation")}
-        snapPoints={["60%"]}
+        snapPoints={locationSnapPoints}
+        enablePanDownToClose
+        backdropComponent={renderLocationBackdrop}
+        handleIndicatorStyle={styles.sheetIndicator}
+        backgroundStyle={styles.sheetBackground}
       >
-        <FlatList
+        <View style={styles.locationSheetHeader}>
+          <Text style={styles.locationSheetTitle}>{t("explore.selectLocation")}</Text>
+          <TouchableOpacity onPress={() => locationBottomSheetRef.current?.dismiss()}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        <BottomSheetFlatList
           data={tunisianStates}
           keyExtractor={(item) => item}
           showsVerticalScrollIndicator={false}
@@ -1070,7 +1092,7 @@ export default function ExploreScreen() {
           )}
           contentContainerStyle={styles.listContent}
         />
-      </BottomSheet>
+      </BottomSheetModal>
 
       {/* Advanced Filter Panel */}
       <FilterPanel
@@ -1178,36 +1200,47 @@ const styles = StyleSheet.create({
   },
   storiesContainer: {
     paddingLeft: 20,
-    paddingRight: 20,
+    paddingRight: 0,
     paddingVertical: 22,
   },
   storyCard: {
-    width: 118,
-    height: 188,
-    marginRight: 20,
+    width: 305,
+    height: 200,
+    marginRight: 12,
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "#FF6B1A",
-    justifyContent: "space-between",
-    transform: [{ rotate: "-10deg" }],
-    shadowColor: "#FF6B1A",
+    backgroundColor: "#FF8C42",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    shadowColor: "#FF8C42",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 9,
   },
   storyCardImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: undefined,
-    height: undefined,
+    position: "absolute",
+    top: 5,
+    left: 5,
+    right: 5,
+    bottom: 5,
+    borderRadius: 14,
   },
-  storyCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255, 107, 26, 0.22)",
+  storyGlassPanel: {
+    position: "absolute",
+    bottom: 5,
+    left: 5,
+    right: 5,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    overflow: "hidden",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.25)",
   },
-  storyContent: {
+  storyGlassPanelInner: {
     paddingHorizontal: 12,
-    paddingBottom: 14,
+    paddingVertical: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
   storyTitle: {
     fontSize: 14,
@@ -1386,6 +1419,30 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+  },
+  sheetBackground: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+  },
+  sheetIndicator: {
+    backgroundColor: "#E0E0E0",
+    width: 40,
+  },
+  locationSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  locationSheetTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#333333",
+    fontFamily: "raleway-500Medium",
   },
   // Empty State styles
   emptyStateContainer: {

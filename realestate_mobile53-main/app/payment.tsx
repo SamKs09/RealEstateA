@@ -266,10 +266,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
-    fontFamily: "raleway-500Medium",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   placeholder: {
     width: 40,

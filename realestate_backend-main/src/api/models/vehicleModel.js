@@ -157,7 +157,7 @@ const vehicleSchema = new Schema({
   status: {
     type: String,
     enum: {
-      values: ['active', 'inactive', 'sold', 'rented', 'pending'],
+      values: ['active', 'inactive', 'sold', 'rented', 'pending', 'archived'],
       message: '{VALUE} is not a valid status'
     },
     default: 'active'

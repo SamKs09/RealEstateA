@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontFamily: "Raleway-Bold",
-    color: "#FF8C42",
+    color: "#333333",
   },
   tabContainer: {
     flexDirection: "row",

@@ -74,6 +74,7 @@ export interface Property {
   likes?: number;
   isPromoted?: boolean;
   promotionExpiry?: string;
+  boostPlan?: '1day' | '3day' | '7day' | null;
   isLocked?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -128,6 +129,10 @@ export const updateProperty = async (propertyId: string, propertyData: Partial<C
 
 export const deleteProperty = async (propertyId: string): Promise<void> => {
   await api.delete(`/properties/${propertyId}`);
+};
+
+export const archiveProperty = async (propertyId: string): Promise<void> => {
+  await api.patch(`/properties/${propertyId}`, { status: 'archived' });
 };
 
 export const getProperty = async (propertyId: string): Promise<Property> => {

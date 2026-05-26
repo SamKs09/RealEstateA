@@ -110,7 +110,7 @@ export default {
     promotedBySellers: 'Promoted by sellers',
     promotedFallback: 'Promoted',
     boostedListings: 'Boosted listings',
-    boostedVehicles: 'Boosted properties',
+    boostedVehicles: 'Boosted vehicles',
   },
 
   bookings: {
@@ -949,5 +949,52 @@ export default {
     starting: "Starting your trial...",
     success: "Trial started successfully!",
     error: "Failed to start trial",
+  },
+
+  sellerDashboard: {
+    title: "My Listings",
+    loading: "Loading your listings...",
+    // Promo banner
+    promoHeadline: "Sell faster, reach more buyers",
+    promoSub: "Boosted listings get up to",
+    promoHighlight: "5× more views",
+    promoSubEnd: "than standard ones.",
+    boostsLeft: "Boosts left",
+    currentPlan: "Current plan",
+    listingSlots: "Listing slots",
+    boostListing: "Boost a Listing",
+    upgradePlan: "Upgrade Plan",
+    noBoostsNudge: "You have no boosts left — upgrade your plan to get more!",
+    // Stats & tabs
+    statTotal: "Total",
+    statBoosted: "Boosted",
+    statArchived: "Archived",
+    tabAll: "All",
+    tabBoosted: "Boosted",
+    tabArchived: "Archived",
+    // Empty states
+    noListings: "No listings yet",
+    noBoostedListings: "No boosted listings",
+    noArchivedListings: "No archived listings",
+    archivedWillAppear: "Archived listings will appear here",
+    addFirstVehicle: "Start by adding your first vehicle listing",
+    addFirstProperty: "Start by adding your first property listing",
+    addVehicle: "Add Vehicle",
+    addProperty: "Add Property",
+    // Archive alert
+    archiveTitle: "Archive Listing",
+    archiveConfirm: "Archive \"%{title}\"? It will be hidden from searches but kept in your account.",
+    archiveButton: "Archive",
+    cancel: "Cancel",
+    archiveFailed: "Failed to archive listing",
+    // Card
+    priceOnRequest: "Price on request",
+    perMonth: "/month",
+    statusActive: "Active",
+    statusInactive: "Inactive",
+    statusPending: "Pending",
+    statusSold: "Sold",
+    statusRented: "Rented",
+    statusArchived: "Archived",
   },
 };

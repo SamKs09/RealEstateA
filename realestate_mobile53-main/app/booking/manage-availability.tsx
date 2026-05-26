@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerCenter: { flex: 1, alignItems: "center" },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: "#1A1A1A", fontFamily: "raleway-700Bold" },
+  headerTitle: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333333" },
   headerSub: { fontSize: 12, color: "#888", marginTop: 2, maxWidth: 200, fontFamily: "raleway-400Regular" },
 
   // Scroll

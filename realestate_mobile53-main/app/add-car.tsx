@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,13 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import {
+  BottomSheetModal,
+  BottomSheetModalProvider,
+  BottomSheetFlatList,
+  BottomSheetBackdrop,
+  BottomSheetTextInput,
+} from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -19,6 +26,43 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from "../hooks/useTranslation";
 import { BackButton, SuccessModal, MapPicker } from "../components/Ui";
 import { vehicleService } from "../services";
+
+const CAR_BRANDS_MODELS: Record<string, string[]> = {
+  BMW: ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "6 Series", "7 Series", "X1", "X3", "X5", "X6", "M3", "M5"],
+  "Mercedes-Benz": ["A-Class", "B-Class", "C-Class", "E-Class", "S-Class", "CLA", "GLA", "GLB", "GLC", "GLE", "GLS", "Sprinter"],
+  Volkswagen: ["Golf", "Polo", "Passat", "Tiguan", "Touareg", "Jetta", "T-Roc", "T-Cross", "Caddy"],
+  Renault: ["Clio", "Logan", "Sandero", "Duster", "Megane", "Koleos", "Kadjar", "Symbol", "Captur", "Kangoo", "Scenic"],
+  Peugeot: ["108", "206", "207", "208", "2008", "301", "308", "3008", "408", "5008", "Partner"],
+  "Citroën": ["C1", "C3", "C4", "C5", "C3 Aircross", "C5 Aircross", "Berlingo", "Xsara", "Jumpy"],
+  Fiat: ["500", "Punto", "Tipo", "Bravo", "Doblo", "Stilo", "Uno", "Panda", "Ducato"],
+  Toyota: ["Yaris", "Corolla", "Camry", "Avensis", "RAV4", "Land Cruiser", "Hilux", "C-HR", "Prius", "Fortuner"],
+  Hyundai: ["i10", "i20", "i30", "Accent", "Elantra", "Tucson", "Santa Fe", "Creta", "Kona"],
+  Kia: ["Picanto", "Rio", "Cerato", "Sportage", "Sorento", "Stonic", "Soul", "Carnival"],
+  Dacia: ["Logan", "Sandero", "Duster", "Spring", "Jogger", "Lodgy"],
+  Audi: ["A1", "A3", "A4", "A5", "A6", "A7", "Q2", "Q3", "Q5", "Q7", "TT"],
+  Seat: ["Ibiza", "Leon", "Arona", "Ateca", "Tarraco", "Toledo"],
+  Skoda: ["Fabia", "Octavia", "Superb", "Karoq", "Kodiaq", "Rapid"],
+  Opel: ["Corsa", "Astra", "Insignia", "Mokka", "Crossland", "Grandland", "Zafira"],
+  Ford: ["Fiesta", "Focus", "Mondeo", "Kuga", "Puma", "EcoSport", "Ranger", "Transit"],
+  Suzuki: ["Swift", "Celerio", "Baleno", "Vitara", "S-Cross", "Jimny", "Ignis"],
+  Nissan: ["Micra", "Juke", "Qashqai", "X-Trail", "Navara", "Patrol", "Leaf", "Note"],
+  Honda: ["Jazz", "Civic", "Accord", "HR-V", "CR-V", "City"],
+  Mazda: ["Mazda2", "Mazda3", "Mazda6", "CX-3", "CX-30", "CX-5"],
+  Mitsubishi: ["Lancer", "Outlander", "Pajero", "Eclipse Cross", "ASX", "L200"],
+  Chevrolet: ["Aveo", "Cruze", "Trax", "Captiva", "Spark", "Malibu"],
+  Jeep: ["Renegade", "Compass", "Cherokee", "Grand Cherokee", "Wrangler"],
+  "Alfa Romeo": ["MiTo", "Giulietta", "Giulia", "Stelvio", "Tonale"],
+  Volvo: ["XC40", "XC60", "XC90", "S60", "S90", "V60", "V90"],
+  "Land Rover": ["Defender", "Discovery", "Discovery Sport", "Range Rover", "Range Rover Sport", "Range Rover Evoque"],
+  Porsche: ["Cayenne", "Macan", "Panamera", "Taycan", "911", "Boxster"],
+  Subaru: ["Impreza", "Legacy", "Outback", "Forester", "XV"],
+  Chery: ["Tiggo 4", "Tiggo 7", "Tiggo 8", "Arrizo 5", "Arrizo 6"],
+  MG: ["MG3", "MG5", "MG6", "ZS", "HS", "RX5"],
+  "Great Wall": ["Haval H2", "Haval H6", "Haval Jolion", "Poer"],
+  Other: ["Other"],
+};
+
+const BRAND_NAMES = Object.keys(CAR_BRANDS_MODELS).sort();
 
 export default function AddCarNewScreen() {
   const router = useRouter();
@@ -31,6 +75,18 @@ export default function AddCarNewScreen() {
   const [loading, setLoading] = useState(false);
 
   const [vehicleType, setVehicleType] = useState<"car" | "motorcycle">("car");
+  const brandSheetRef = useRef<BottomSheetModal>(null);
+  const modelSheetRef = useRef<BottomSheetModal>(null);
+  const [brandSearch, setBrandSearch] = useState("");
+  const [modelSearch, setModelSearch] = useState("");
+  const snapPoints = useMemo(() => ["65%"], []);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.4} />
+    ),
+    []
+  );
 
   const [formData, setFormData] = useState({
     brand: "",
@@ -259,6 +315,7 @@ export default function AddCarNewScreen() {
   };
 
   return (
+    <BottomSheetModalProvider>
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -315,25 +372,30 @@ export default function AddCarNewScreen() {
         {/* Brand */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Brand</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="BMW"
-            placeholderTextColor="#CCCCCC"
-            value={formData.brand}
-            onChangeText={(text) => updateFormData("brand", text)}
-          />
+          <TouchableOpacity
+            style={styles.pickerTrigger}
+            onPress={() => brandSheetRef.current?.present()}
+          >
+            <Text style={formData.brand ? styles.pickerTriggerText : styles.pickerTriggerPlaceholder}>
+              {formData.brand || "Select brand"}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#CCCCCC" />
+          </TouchableOpacity>
         </View>
 
         {/* Model */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Model</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Electric"
-            placeholderTextColor="#CCCCCC"
-            value={formData.model}
-            onChangeText={(text) => updateFormData("model", text)}
-          />
+          <TouchableOpacity
+            style={[styles.pickerTrigger, !formData.brand && styles.pickerTriggerDisabled]}
+            onPress={() => formData.brand && modelSheetRef.current?.present()}
+            activeOpacity={formData.brand ? 0.7 : 1}
+          >
+            <Text style={formData.model ? styles.pickerTriggerText : styles.pickerTriggerPlaceholder}>
+              {formData.model || (formData.brand ? "Select model" : "Select a brand first")}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#CCCCCC" />
+          </TouchableOpacity>
         </View>
 
         {/* Conditional Fields Based on Vehicle Type */}
@@ -603,6 +665,125 @@ export default function AddCarNewScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      {/* Brand Bottom Sheet */}
+      <BottomSheetModal
+        ref={brandSheetRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        handleIndicatorStyle={styles.sheetIndicator}
+        backgroundStyle={styles.sheetBackground}
+        keyboardBehavior="interactive"
+        android_keyboardInputMode="adjustResize"
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Select Brand</Text>
+          <TouchableOpacity onPress={() => { brandSheetRef.current?.dismiss(); setBrandSearch(""); }}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.sheetSearch}>
+          <Ionicons name="search" size={16} color="#8A8A8A" />
+          <BottomSheetTextInput
+            style={styles.sheetSearchInput}
+            placeholder="Search brand..."
+            placeholderTextColor="#CCCCCC"
+            value={brandSearch}
+            onChangeText={setBrandSearch}
+          />
+        </View>
+        <BottomSheetFlatList
+          data={BRAND_NAMES.filter((b) =>
+            b.toLowerCase().includes(brandSearch.toLowerCase())
+          )}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.sheetItem,
+                formData.brand === item && styles.sheetItemActive,
+              ]}
+              onPress={() => {
+                updateFormData("brand", item);
+                updateFormData("model", "");
+                brandSheetRef.current?.dismiss();
+                setBrandSearch("");
+              }}
+            >
+              <Text style={[
+                styles.sheetItemText,
+                formData.brand === item && styles.sheetItemTextActive,
+              ]}>
+                {item}
+              </Text>
+              {formData.brand === item && (
+                <Ionicons name="checkmark" size={18} color="#FF8C42" />
+              )}
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      </BottomSheetModal>
+
+      {/* Model Bottom Sheet */}
+      <BottomSheetModal
+        ref={modelSheetRef}
+        snapPoints={snapPoints}
+        enablePanDownToClose
+        backdropComponent={renderBackdrop}
+        handleIndicatorStyle={styles.sheetIndicator}
+        backgroundStyle={styles.sheetBackground}
+        keyboardBehavior="interactive"
+        android_keyboardInputMode="adjustResize"
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Select Model</Text>
+          <TouchableOpacity onPress={() => { modelSheetRef.current?.dismiss(); setModelSearch(""); }}>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.sheetSearch}>
+          <Ionicons name="search" size={16} color="#8A8A8A" />
+          <BottomSheetTextInput
+            style={styles.sheetSearchInput}
+            placeholder="Search model..."
+            placeholderTextColor="#CCCCCC"
+            value={modelSearch}
+            onChangeText={setModelSearch}
+          />
+        </View>
+        <BottomSheetFlatList
+          data={(CAR_BRANDS_MODELS[formData.brand] || []).filter((m) =>
+            m.toLowerCase().includes(modelSearch.toLowerCase())
+          )}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.sheetItem,
+                formData.model === item && styles.sheetItemActive,
+              ]}
+              onPress={() => {
+                updateFormData("model", item);
+                modelSheetRef.current?.dismiss();
+                setModelSearch("");
+              }}
+            >
+              <Text style={[
+                styles.sheetItemText,
+                formData.model === item && styles.sheetItemTextActive,
+              ]}>
+                {item}
+              </Text>
+              {formData.model === item && (
+                <Ionicons name="checkmark" size={18} color="#FF8C42" />
+              )}
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      </BottomSheetModal>
+
       {/* Map Picker Modal */}
       <MapPicker
         visible={showMapPicker}
@@ -630,6 +811,7 @@ export default function AddCarNewScreen() {
         }}
       />
     </View>
+    </BottomSheetModalProvider>
   );
 }
 
@@ -648,9 +830,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#FF8C42",
-    fontFamily: "raleway-500Medium",
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   scrollView: {
     flex: 1,
@@ -792,6 +973,91 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#FFFFFF",
+    fontFamily: "raleway-500Medium",
+  },
+  pickerTrigger: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: "#E8E8E8",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pickerTriggerDisabled: {
+    backgroundColor: "#FAFAFA",
+  },
+  pickerTriggerText: {
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
+    color: "#333333",
+  },
+  pickerTriggerPlaceholder: {
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
+    color: "#CCCCCC",
+  },
+  sheetBackground: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: "#FFFFFF",
+  },
+  sheetIndicator: {
+    backgroundColor: "#E0E0E0",
+    width: 40,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#333333",
+    fontFamily: "raleway-500Medium",
+  },
+  sheetSearch: {
+    flexDirection: "row",
+    alignItems: "center",
+    margin: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F8F8F8",
+    borderRadius: 14,
+    gap: 8,
+  },
+  sheetSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
+    color: "#333333",
+  },
+  sheetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  sheetItemActive: {
+    backgroundColor: "#FFF5F0",
+  },
+  sheetItemText: {
+    fontSize: 15,
+    fontFamily: "raleway-400Regular",
+    color: "#333333",
+  },
+  sheetItemTextActive: {
+    color: "#FF8C42",
     fontFamily: "raleway-500Medium",
   },
 });

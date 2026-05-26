@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
-  headerTitle: { fontSize: 22, fontFamily: "Raleway-Bold", color: "#FF6B35", marginTop: -10 },
+  headerTitle: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333333", marginTop: -10 },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   loadingText: { marginTop: 10, fontSize: 16, fontFamily: "Raleway", color: "#666" },
   stepIndicator: {

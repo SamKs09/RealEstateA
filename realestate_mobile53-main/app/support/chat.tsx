@@ -342,9 +342,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   headerSubtitle: {
     fontSize: 14,

@@ -191,10 +191,9 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#FF8C42",
-    fontFamily: "raleway-700Bold",
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
   },
   mainDesc: {
     fontSize: 14,
