@@ -132,7 +132,7 @@ export default function EditPropertyScreen() {
     const loadPropertyData = async () => {
       try {
         const property = await getProperty(propertyId);
-        
+
         // Map property data to form data
         setFormData({
           title: property.title || "",
@@ -147,15 +147,18 @@ export default function EditPropertyScreen() {
           furnishing: property.propertyDetails?.furnishing || "unfurnished",
           amenities: property.propertyDetails?.amenities || [],
           age: property.propertyDetails?.age?.toString() || "",
-          location: property.location?.coordinates ? {
-            latitude: property.location.coordinates.latitude,
-            longitude: property.location.coordinates.longitude
-          } : null,
+          location: property.location?.coordinates
+            ? {
+                latitude: property.location.coordinates.latitude,
+                longitude: property.location.coordinates.longitude,
+              }
+            : null,
           salePrice: property.pricing?.salePrice?.toString() || "",
           rentPrice: property.pricing?.rentPrice?.toString() || "",
           rentPeriod: property.pricing?.rentPeriod || "monthly",
           deposit: property.pricing?.deposit?.toString() || "",
-          maintenanceCharges: property.pricing?.maintenanceCharges?.toString() || "",
+          maintenanceCharges:
+            property.pricing?.maintenanceCharges?.toString() || "",
           currency: property.pricing?.currency || "DT",
           priceNegotiable: property.pricing?.priceNegotiable ?? true,
           features: property.features || [],
@@ -168,7 +171,10 @@ export default function EditPropertyScreen() {
         if (property.location?.address) {
           setLocationAddress(property.location.address);
         } else if (property.location?.coordinates) {
-          getAddressFromCoordinates(property.location.coordinates.latitude, property.location.coordinates.longitude);
+          getAddressFromCoordinates(
+            property.location.coordinates.latitude,
+            property.location.coordinates.longitude,
+          );
         }
 
         setIsLoading(false);
@@ -213,11 +219,14 @@ export default function EditPropertyScreen() {
     }));
   };
 
-  const getAddressFromCoordinates = async (latitude: number, longitude: number) => {
+  const getAddressFromCoordinates = async (
+    latitude: number,
+    longitude: number,
+  ) => {
     try {
       // Note: Using the same API key as add-house.tsx
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyAqSchAEdRlw3Rsk17pfI7H4NaWnmiROi4`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyAqSchAEdRlw3Rsk17pfI7H4NaWnmiROi4`,
       );
       const data = await response.json();
       if (data.results && data.results.length > 0) {
@@ -231,7 +240,10 @@ export default function EditPropertyScreen() {
     }
   };
 
-  const handleLocationSelect = async (location: { latitude: number; longitude: number }) => {
+  const handleLocationSelect = async (location: {
+    latitude: number;
+    longitude: number;
+  }) => {
     setFormData((prev) => ({ ...prev, location }));
     await getAddressFromCoordinates(location.latitude, location.longitude);
   };
@@ -239,7 +251,10 @@ export default function EditPropertyScreen() {
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(t("addProperty.permissionNeeded") || "Permission Required", "Please grant photo library access.");
+      Alert.alert(
+        t("addProperty.permissionNeeded") || "Permission Required",
+        "Please grant photo library access.",
+      );
       return;
     }
 
@@ -251,32 +266,36 @@ export default function EditPropertyScreen() {
     });
 
     if (!result.canceled && result.assets) {
-      const totalImages = formData.existingImages.length + formData.selectedImages.length;
+      const totalImages =
+        formData.existingImages.length + formData.selectedImages.length;
       const remainingSlots = 15 - totalImages;
-      
+
       const cappedImages = result.assets.slice(0, remainingSlots);
-      
+
       if (cappedImages.length < result.assets.length) {
-        Alert.alert(t("addProperty.error"), t("addProperty.mediaLimitExceeded") || "Maximum 15 images allowed");
+        Alert.alert(
+          t("addProperty.error"),
+          t("addProperty.mediaLimitExceeded") || "Maximum 15 images allowed",
+        );
       }
-      
-      setFormData(prev => ({
+
+      setFormData((prev) => ({
         ...prev,
-        selectedImages: [...prev.selectedImages, ...cappedImages]
+        selectedImages: [...prev.selectedImages, ...cappedImages],
       }));
     }
   };
 
   const removeImage = (index: number, isExisting: boolean) => {
     if (isExisting) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        existingImages: prev.existingImages.filter((_, i) => i !== index)
+        existingImages: prev.existingImages.filter((_, i) => i !== index),
       }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        selectedImages: prev.selectedImages.filter((_, i) => i !== index)
+        selectedImages: prev.selectedImages.filter((_, i) => i !== index),
       }));
     }
   };
@@ -285,7 +304,10 @@ export default function EditPropertyScreen() {
     switch (step) {
       case 1:
         if (!formData.title.trim()) {
-          Alert.alert(t("addProperty.error"), t("addProperty.enterPropertyTitle"));
+          Alert.alert(
+            t("addProperty.error"),
+            t("addProperty.enterPropertyTitle"),
+          );
           return false;
         }
         if (!formData.description.trim()) {
@@ -295,13 +317,23 @@ export default function EditPropertyScreen() {
         return true;
       case 3:
         if (!formData.location) {
-          Alert.alert(t("addProperty.error"), t("addHouse.selectLocation") || "Please select a location");
+          Alert.alert(
+            t("addProperty.error"),
+            t("addHouse.selectLocation") || "Please select a location",
+          );
           return false;
         }
         return true;
       case 4:
-        if (formData.existingImages.length === 0 && formData.selectedImages.length === 0) {
-          Alert.alert(t("addProperty.error"), t("addProperty.addAtLeastOneMedia") || "Please add at least one image");
+        if (
+          formData.existingImages.length === 0 &&
+          formData.selectedImages.length === 0
+        ) {
+          Alert.alert(
+            t("addProperty.error"),
+            t("addProperty.addAtLeastOneMedia") ||
+              "Please add at least one image",
+          );
           return false;
         }
         return true;
@@ -328,11 +360,13 @@ export default function EditPropertyScreen() {
       // Helper function to convert full URL back to relative path
       const toRelativePath = (url: string) => {
         if (!url) return url;
-        if (url.startsWith('http')) {
+        if (url.startsWith("http")) {
           try {
             const urlObj = new URL(url);
             // Check if it's our local media
-            const isLocalMedia = urlObj.pathname.startsWith('/uploads') || urlObj.pathname.startsWith('/images-users');
+            const isLocalMedia =
+              urlObj.pathname.startsWith("/uploads") ||
+              urlObj.pathname.startsWith("/images-users");
             if (isLocalMedia) {
               return urlObj.pathname;
             }
@@ -343,7 +377,7 @@ export default function EditPropertyScreen() {
         return url;
       };
 
-      const addressParts = locationAddress.split(",").map(p => p.trim());
+      const addressParts = locationAddress.split(",").map((p) => p.trim());
       const city = addressParts[addressParts.length - 2] || "Unknown City";
       const state = addressParts[addressParts.length - 3] || "Unknown State";
 
@@ -354,7 +388,9 @@ export default function EditPropertyScreen() {
         listingType: formData.listingType,
         propertyDetails: {
           bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
-          bathrooms: formData.bathrooms ? parseInt(formData.bathrooms) : undefined,
+          bathrooms: formData.bathrooms
+            ? parseInt(formData.bathrooms)
+            : undefined,
           area: formData.area ? parseFloat(formData.area) : undefined,
           areaUnit: formData.areaUnit,
           parking: formData.parking ? parseInt(formData.parking) : undefined,
@@ -373,11 +409,18 @@ export default function EditPropertyScreen() {
           },
         },
         pricing: {
-          salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined,
-          rentPrice: formData.rentPrice ? parseFloat(formData.rentPrice) : undefined,
-          rentPeriod: formData.listingType === "rent" ? formData.rentPeriod : undefined,
+          salePrice: formData.salePrice
+            ? parseFloat(formData.salePrice)
+            : undefined,
+          rentPrice: formData.rentPrice
+            ? parseFloat(formData.rentPrice)
+            : undefined,
+          rentPeriod:
+            formData.listingType === "rent" ? formData.rentPeriod : undefined,
           deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
-          maintenanceCharges: formData.maintenanceCharges ? parseFloat(formData.maintenanceCharges) : undefined,
+          maintenanceCharges: formData.maintenanceCharges
+            ? parseFloat(formData.maintenanceCharges)
+            : undefined,
           currency: formData.currency,
           priceNegotiable: formData.priceNegotiable,
         },
@@ -385,7 +428,7 @@ export default function EditPropertyScreen() {
         rules: formData.rules,
         media: {
           images: formData.existingImages.map(toRelativePath),
-        }
+        },
       };
 
       console.log("📤 Updating property with data:", propertyData);
@@ -395,21 +438,26 @@ export default function EditPropertyScreen() {
       if (formData.selectedImages.length > 0) {
         const mediaFormData = new FormData();
         formData.selectedImages.forEach((img, i) => {
-          mediaFormData.append('images', {
+          mediaFormData.append("images", {
             uri: img.uri,
             type: "image/jpeg",
-            name: `prop_${propertyId}_${Date.now()}_${i}.jpg`
+            name: `prop_${propertyId}_${Date.now()}_${i}.jpg`,
           } as any);
         });
 
-        console.log(`📤 Uploading ${formData.selectedImages.length} new images...`);
+        console.log(
+          `📤 Uploading ${formData.selectedImages.length} new images...`,
+        );
         await uploadPropertyMedia(propertyId, mediaFormData);
       }
 
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error("Error updating property:", error);
-      Alert.alert(t("addHouse.error"), error.message || "Failed to update property");
+      Alert.alert(
+        t("addHouse.error"),
+        error.message || "Failed to update property",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -419,10 +467,29 @@ export default function EditPropertyScreen() {
     <View style={styles.stepIndicator}>
       {[1, 2, 3, 4, 5, 6].map((step, index) => (
         <View key={step} style={styles.stepContainer}>
-          <View style={[styles.stepCircle, currentStep >= step && styles.stepCircleActive]}>
-            <Text style={[styles.stepNumber, currentStep >= step && styles.stepNumberActive]}>{step}</Text>
+          <View
+            style={[
+              styles.stepCircle,
+              currentStep >= step && styles.stepCircleActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepNumber,
+                currentStep >= step && styles.stepNumberActive,
+              ]}
+            >
+              {step}
+            </Text>
           </View>
-          {step < 6 && <View style={[styles.stepLine, currentStep > step && styles.stepLineActive]} />}
+          {step < 6 && (
+            <View
+              style={[
+                styles.stepLine,
+                currentStep > step && styles.stepLineActive,
+              ]}
+            />
+          )}
         </View>
       ))}
     </View>
@@ -443,7 +510,7 @@ export default function EditPropertyScreen() {
   const renderStep1 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step1")}</Text>
-      
+
       <View style={styles.inputContainer}>
         <Text style={styles.label}>{t("addProperty.title")} *</Text>
         <TextInput
@@ -472,10 +539,18 @@ export default function EditPropertyScreen() {
           {PROPERTY_TYPES.map((type) => (
             <TouchableOpacity
               key={type.value}
-              style={[styles.chip, formData.type === type.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.type === type.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("type", type.value)}
             >
-              <Text style={[styles.chipText, formData.type === type.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.type === type.value && styles.chipTextSelected,
+                ]}
+              >
                 {t(`explore.${type.value}`)}
               </Text>
             </TouchableOpacity>
@@ -489,11 +564,22 @@ export default function EditPropertyScreen() {
           {LISTING_TYPES.map((type) => (
             <TouchableOpacity
               key={type.value}
-              style={[styles.chip, formData.listingType === type.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.listingType === type.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("listingType", type.value)}
             >
-              <Text style={[styles.chipText, formData.listingType === type.value && styles.chipTextSelected]}>
-                {t(`addProperty.${type.value === "sale" ? "forSale" : "forRent"}`)}
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.listingType === type.value &&
+                    styles.chipTextSelected,
+                ]}
+              >
+                {t(
+                  `addProperty.${type.value === "sale" ? "forSale" : "forRent"}`,
+                )}
               </Text>
             </TouchableOpacity>
           ))}
@@ -505,7 +591,7 @@ export default function EditPropertyScreen() {
   const renderStep2 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step2")}</Text>
-      
+
       <View style={styles.row}>
         <View style={styles.halfWidth}>
           <Text style={styles.label}>{t("addProperty.bedrooms")}</Text>
@@ -546,10 +632,18 @@ export default function EditPropertyScreen() {
             {AREA_UNITS.map((unit) => (
               <TouchableOpacity
                 key={unit.value}
-                style={[styles.chipSmall, formData.areaUnit === unit.value && styles.chipSelected]}
+                style={[
+                  styles.chipSmall,
+                  formData.areaUnit === unit.value && styles.chipSelected,
+                ]}
                 onPress={() => updateFormData("areaUnit", unit.value)}
               >
-                <Text style={[styles.chipTextSmall, formData.areaUnit === unit.value && styles.chipTextSelected]}>
+                <Text
+                  style={[
+                    styles.chipTextSmall,
+                    formData.areaUnit === unit.value && styles.chipTextSelected,
+                  ]}
+                >
                   {t(`addProperty.${unit.value}`)}
                 </Text>
               </TouchableOpacity>
@@ -564,11 +658,22 @@ export default function EditPropertyScreen() {
           {FURNISHING_OPTIONS.map((option) => (
             <TouchableOpacity
               key={option.value}
-              style={[styles.chip, formData.furnishing === option.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.furnishing === option.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("furnishing", option.value)}
             >
-              <Text style={[styles.chipText, formData.furnishing === option.value && styles.chipTextSelected]}>
-                {t(`addProperty.${option.value === "semi-furnished" ? "semiFurnished" : option.value}`)}
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.furnishing === option.value &&
+                    styles.chipTextSelected,
+                ]}
+              >
+                {t(
+                  `addProperty.${option.value === "semi-furnished" ? "semiFurnished" : option.value}`,
+                )}
               </Text>
             </TouchableOpacity>
           ))}
@@ -581,10 +686,19 @@ export default function EditPropertyScreen() {
           {COMMON_AMENITIES.map((amenity) => (
             <TouchableOpacity
               key={amenity}
-              style={[styles.chip, formData.amenities.includes(amenity) && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.amenities.includes(amenity) && styles.chipSelected,
+              ]}
               onPress={() => toggleArrayItem("amenities", amenity)}
             >
-              <Text style={[styles.chipText, formData.amenities.includes(amenity) && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.amenities.includes(amenity) &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {amenity}
               </Text>
             </TouchableOpacity>
@@ -597,9 +711,12 @@ export default function EditPropertyScreen() {
   const renderStep3 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step3")}</Text>
-      
+
       <TouchableOpacity
-        style={[styles.locationButton, formData.location && styles.locationButtonWithMap]}
+        style={[
+          styles.locationButton,
+          formData.location && styles.locationButtonWithMap,
+        ]}
         onPress={() => setShowMapPicker(true)}
       >
         {formData.location ? (
@@ -630,7 +747,9 @@ export default function EditPropertyScreen() {
         ) : (
           <View style={styles.locationPlaceholder}>
             <Ionicons name="map-outline" size={32} color="#FF6B35" />
-            <Text style={styles.locationPlaceholderText}>{t("addHouse.selectLocationOnMap")}</Text>
+            <Text style={styles.locationPlaceholderText}>
+              {t("addHouse.selectLocationOnMap")}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -640,7 +759,7 @@ export default function EditPropertyScreen() {
   const renderStep5 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step5")}</Text>
-      
+
       {formData.listingType === "sale" ? (
         <View style={styles.inputContainer}>
           <Text style={styles.label}>{t("addProperty.salePrice")} (DT) *</Text>
@@ -655,7 +774,9 @@ export default function EditPropertyScreen() {
       ) : (
         <>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t("addProperty.rentPrice")} (DT) *</Text>
+            <Text style={styles.label}>
+              {t("addProperty.rentPrice")} (DT) *
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="0.00"
@@ -670,10 +791,19 @@ export default function EditPropertyScreen() {
               {RENT_PERIODS.map((period) => (
                 <TouchableOpacity
                   key={period.value}
-                  style={[styles.chip, formData.rentPeriod === period.value && styles.chipSelected]}
+                  style={[
+                    styles.chip,
+                    formData.rentPeriod === period.value && styles.chipSelected,
+                  ]}
                   onPress={() => updateFormData("rentPeriod", period.value)}
                 >
-                  <Text style={[styles.chipText, formData.rentPeriod === period.value && styles.chipTextSelected]}>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      formData.rentPeriod === period.value &&
+                        styles.chipTextSelected,
+                    ]}
+                  >
                     {t(`addProperty.${period.value}`)}
                   </Text>
                 </TouchableOpacity>
@@ -695,7 +825,9 @@ export default function EditPropertyScreen() {
           />
         </View>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>{t("addProperty.maintenanceCharges")}</Text>
+          <Text style={styles.label}>
+            {t("addProperty.maintenanceCharges")}
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="0"
@@ -720,12 +852,15 @@ export default function EditPropertyScreen() {
   const renderStep4 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step4")}</Text>
-      
+
       <TouchableOpacity style={styles.uploadButton} onPress={pickMedia}>
         <Ionicons name="images-outline" size={40} color="#FF6B35" />
-        <Text style={styles.uploadText}>{t("addProperty.selectMedia") || "Select Photos"}</Text>
+        <Text style={styles.uploadText}>
+          {t("addProperty.selectMedia") || "Select Photos"}
+        </Text>
         <Text style={styles.imageCount}>
-          {formData.existingImages.length + formData.selectedImages.length}/15 {t("addProperty.images")}
+          {formData.existingImages.length + formData.selectedImages.length}/15{" "}
+          {t("addProperty.images")}
         </Text>
       </TouchableOpacity>
 
@@ -733,8 +868,15 @@ export default function EditPropertyScreen() {
         {/* Existing Images */}
         {formData.existingImages.map((uri, i) => (
           <View key={`existing-${i}`} style={styles.imageItem}>
-            <Image source={{ uri }} style={styles.imagePreview} contentFit="cover" />
-            <TouchableOpacity style={styles.removeIcon} onPress={() => removeImage(i, true)}>
+            <Image
+              source={{ uri }}
+              style={styles.imagePreview}
+              contentFit="cover"
+            />
+            <TouchableOpacity
+              style={styles.removeIcon}
+              onPress={() => removeImage(i, true)}
+            >
               <Ionicons name="close-circle" size={24} color="#FF3B30" />
             </TouchableOpacity>
           </View>
@@ -742,11 +884,18 @@ export default function EditPropertyScreen() {
         {/* New Selected Images */}
         {formData.selectedImages.map((img, i) => (
           <View key={`new-${i}`} style={styles.imageItem}>
-            <Image source={{ uri: img.uri }} style={styles.imagePreview} contentFit="cover" />
+            <Image
+              source={{ uri: img.uri }}
+              style={styles.imagePreview}
+              contentFit="cover"
+            />
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>NEW</Text>
             </View>
-            <TouchableOpacity style={styles.removeIcon} onPress={() => removeImage(i, false)}>
+            <TouchableOpacity
+              style={styles.removeIcon}
+              onPress={() => removeImage(i, false)}
+            >
               <Ionicons name="close-circle" size={24} color="#FF3B30" />
             </TouchableOpacity>
           </View>
@@ -758,17 +907,26 @@ export default function EditPropertyScreen() {
   const renderStep6 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>{t("addProperty.step6")}</Text>
-      
+
       <View style={styles.inputContainer}>
         <Text style={styles.label}>{t("addProperty.additionalFeatures")}</Text>
         <View style={styles.chipContainer}>
           {COMMON_FEATURES.map((feature) => (
             <TouchableOpacity
               key={feature}
-              style={[styles.chip, formData.features.includes(feature) && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.features.includes(feature) && styles.chipSelected,
+              ]}
               onPress={() => toggleArrayItem("features", feature)}
             >
-              <Text style={[styles.chipText, formData.features.includes(feature) && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.features.includes(feature) &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {feature}
               </Text>
             </TouchableOpacity>
@@ -807,8 +965,10 @@ export default function EditPropertyScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <HeaderWithBackButton 
-          onBackPress={() => currentStep > 1 ? setCurrentStep(s => s - 1) : router.back()} 
+        <HeaderWithBackButton
+          onBackPress={() =>
+            currentStep > 1 ? setCurrentStep((s) => s - 1) : router.back()
+          }
         />
         <Text style={styles.headerTitle}>Edit Property</Text>
         <View style={{ width: 40 }} />
@@ -816,7 +976,10 @@ export default function EditPropertyScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -826,12 +989,17 @@ export default function EditPropertyScreen() {
 
         <View style={styles.footer}>
           {currentStep < 6 ? (
-            <TouchableOpacity style={styles.button} onPress={() => {
-              if (validateStep(currentStep)) {
-                setCurrentStep(s => s + 1);
-              }
-            }}>
-              <Text style={styles.buttonText}>{t("addProperty.next") || "Next"}</Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                if (validateStep(currentStep)) {
+                  setCurrentStep((s) => s + 1);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>
+                {t("addProperty.next") || "Next"}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -839,7 +1007,11 @@ export default function EditPropertyScreen() {
               onPress={handleSubmit}
               disabled={isSubmitting}
             >
-              {isSubmitting ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Save Changes</Text>}
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>Save Changes</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -876,9 +1048,24 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
-  headerTitle: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333333", marginTop: -10 },
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  loadingText: { marginTop: 10, fontSize: 16, fontFamily: "Raleway", color: "#666" },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
+    marginTop: -10,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontFamily: "Raleway",
+    color: "#666",
+  },
   stepIndicator: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -898,13 +1085,28 @@ const styles = StyleSheet.create({
   stepCircleActive: { backgroundColor: "#FF6B35" },
   stepNumber: { fontSize: 14, color: "#999", fontFamily: "Raleway-Bold" },
   stepNumberActive: { color: "#FFF" },
-  stepLine: { width: 30, height: 2, backgroundColor: "#F0F0F0", marginHorizontal: 4 },
+  stepLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: "#F0F0F0",
+    marginHorizontal: 4,
+  },
   stepLineActive: { backgroundColor: "#FF6B35" },
   scrollContent: { padding: 20, paddingBottom: 40 },
   stepContent: { flex: 1 },
-  stepHeader: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333", marginBottom: 20 },
+  stepHeader: {
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333",
+    marginBottom: 20,
+  },
   inputContainer: { marginBottom: 20 },
-  label: { fontSize: 14, fontFamily: "Raleway-SemiBold", color: "#FF6B35", marginBottom: 8 },
+  label: {
+    fontSize: 14,
+    fontFamily: "Raleway-SemiBold",
+    color: "#FF6B35",
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: "#F9F9F9",
     borderRadius: 12,
@@ -917,9 +1119,19 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   textArea: { height: 100, textAlignVertical: "top" },
-  row: { flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 20 },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 20,
+  },
   halfWidth: { flex: 1 },
-  chipContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -964,14 +1176,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  mapOverlayText: { fontSize: 12, color: "#333", flex: 1, fontFamily: "Raleway-Medium" },
+  mapOverlayText: {
+    fontSize: 12,
+    color: "#333",
+    flex: 1,
+    fontFamily: "Raleway-Medium",
+  },
   locationPlaceholder: { alignItems: "center", gap: 10 },
   locationPlaceholderText: { color: "#999", fontFamily: "Raleway" },
-  switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
   ruleInputRow: { flexDirection: "row", gap: 10 },
-  addRuleButton: { width: 48, height: 48, backgroundColor: "#FF6B35", borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  addRuleButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#FF6B35",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   rulesList: { marginTop: 16, gap: 8 },
-  ruleItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#F9F9F9", padding: 12, borderRadius: 10, gap: 10 },
+  ruleItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    padding: 12,
+    borderRadius: 10,
+    gap: 10,
+  },
   ruleText: { flex: 1, fontSize: 14, color: "#333", fontFamily: "Raleway" },
   footer: { marginTop: 40 },
   button: {

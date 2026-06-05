@@ -138,7 +138,7 @@ export default function BookingDetailsScreen() {
     const checkInDate = formatDateForPayment(
       selectedStartDate,
       currentMonth,
-      currentYear
+      currentYear,
     );
     let checkOutDate = checkInDate; // Default to same day if no end date selected
 
@@ -146,7 +146,7 @@ export default function BookingDetailsScreen() {
       checkOutDate = formatDateForPayment(
         selectedEndDate,
         currentMonth,
-        currentYear
+        currentYear,
       );
     }
 

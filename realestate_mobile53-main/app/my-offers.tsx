@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   ScrollView,
@@ -9,21 +9,21 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext';
-import { useTranslation } from '../hooks/useTranslation';
-import apiService from '../services/api';
-import { BackButton } from '../components/Ui/BackButton';
+} from "react-native";
+import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useAuth } from "../contexts/AuthContext";
+import { useTranslation } from "../hooks/useTranslation";
+import apiService from "../services/api";
+import { BackButton } from "../components/Ui/BackButton";
 import {
   Colors,
   Typography,
   Spacing,
   BorderRadius,
   Shadows,
-} from '../components/styles/GlobalStyles';
+} from "../components/styles/GlobalStyles";
 
 interface Offer {
   id: string;
@@ -35,13 +35,13 @@ interface Offer {
     avatar: string;
   };
   message: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: "pending" | "accepted" | "declined";
   createdAt: string;
 }
 
 interface OfferGroup {
   id: string;
-  type: 'property' | 'car';
+  type: "property" | "car";
   item: {
     id: string;
     image: string;
@@ -72,14 +72,14 @@ const MyOffersScreen = () => {
     if (!user || !user._id) return;
     setLoading(true);
     try {
-      const type = user.interest === 'cars' ? 'car' : 'property';
+      const type = user.interest === "cars" ? "car" : "property";
       const res = await apiService.get<any>(`/seller/offers?type=${type}`);
       if (res.success) {
         setOffers(res.offers || []);
       }
     } catch (err: any) {
-      console.error('Error loading offers:', err);
-      Alert.alert(t('offers.error'), err.message || 'Failed to load offers');
+      console.error("Error loading offers:", err);
+      Alert.alert(t("offers.error"), err.message || "Failed to load offers");
     } finally {
       setLoading(false);
     }
@@ -90,28 +90,38 @@ const MyOffersScreen = () => {
       const res = await apiService.put<any>(`/seller/offers/${offerId}/accept`);
       if (res.success) {
         // Update local state
-        setOffers(prev => prev.map(group => ({
-          ...group,
-          offers: group.offers.map(o => o.id === offerId ? { ...o, status: 'accepted' } : o)
-        })));
+        setOffers((prev) =>
+          prev.map((group) => ({
+            ...group,
+            offers: group.offers.map((o) =>
+              o.id === offerId ? { ...o, status: "accepted" } : o,
+            ),
+          })),
+        );
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to accept offer');
+      Alert.alert("Error", err.message || "Failed to accept offer");
     }
   };
 
   const handleDecline = async (offerId: string) => {
     try {
-      const res = await apiService.put<any>(`/seller/offers/${offerId}/decline`);
+      const res = await apiService.put<any>(
+        `/seller/offers/${offerId}/decline`,
+      );
       if (res.success) {
         // Update local state
-        setOffers(prev => prev.map(group => ({
-          ...group,
-          offers: group.offers.map(o => o.id === offerId ? { ...o, status: 'declined' } : o)
-        })));
+        setOffers((prev) =>
+          prev.map((group) => ({
+            ...group,
+            offers: group.offers.map((o) =>
+              o.id === offerId ? { ...o, status: "declined" } : o,
+            ),
+          })),
+        );
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to decline offer');
+      Alert.alert("Error", err.message || "Failed to decline offer");
     }
   };
 
@@ -128,28 +138,34 @@ const MyOffersScreen = () => {
       {/* Custom Header */}
       <View style={styles.header}>
         <BackButton onPress={() => router.back()} color={Colors.textPrimary} />
-        <Text style={styles.headerTitle}>{t('offers.title')}</Text>
+        <Text style={styles.headerTitle}>{t("offers.title")}</Text>
         <TouchableOpacity>
-          <Text style={styles.filterText}>{t('offers.filter')}</Text>
+          <Text style={styles.filterText}>{t("offers.filter")}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {offers.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>{t('offers.noOffers')}</Text>
+            <Text style={styles.emptyText}>{t("offers.noOffers")}</Text>
           </View>
         ) : (
           offers.map((group) => (
             <View key={group.id} style={styles.offerGroup}>
-              <ItemSummary item={group.item} offersCount={group.offers.filter(o => o.status === 'pending').length} t={t} />
+              <ItemSummary
+                item={group.item}
+                offersCount={
+                  group.offers.filter((o) => o.status === "pending").length
+                }
+                t={t}
+              />
               {group.offers.map((offer) => (
-                <OfferCard 
-                  key={offer.id} 
-                  offer={offer} 
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
                   onAccept={() => handleAccept(offer.id)}
                   onDecline={() => handleDecline(offer.id)}
                   t={t}
@@ -163,16 +179,28 @@ const MyOffersScreen = () => {
   );
 };
 
-const ItemSummary = ({ item, offersCount, t }: { item: any; offersCount: number; t: any }) => (
+const ItemSummary = ({
+  item,
+  offersCount,
+  t,
+}: {
+  item: any;
+  offersCount: number;
+  t: any;
+}) => (
   <View style={styles.summaryContainer}>
-    <Image source={{ uri: item.image }} style={styles.itemImage} contentFit="cover" />
+    <Image
+      source={{ uri: item.image }}
+      style={styles.itemImage}
+      contentFit="cover"
+    />
     <View style={styles.itemInfo}>
       <View style={styles.itemHeader}>
         <Text style={styles.itemName}>{item.name}</Text>
         {offersCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {t('offers.pendingOffers', { count: offersCount })}
+              {t("offers.pendingOffers", { count: offersCount })}
             </Text>
           </View>
         )}
@@ -181,29 +209,51 @@ const ItemSummary = ({ item, offersCount, t }: { item: any; offersCount: number;
       <View style={styles.detailsRow}>
         {item.details.bedrooms !== undefined && (
           <View style={styles.detailItem}>
-            <Ionicons name="bed-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="bed-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.detailText}>
-              {item.details.bedrooms} {item.details.bedrooms === 1 ? t('property.bedroom') : t('property.bedrooms')}
+              {item.details.bedrooms}{" "}
+              {item.details.bedrooms === 1
+                ? t("property.bedroom")
+                : t("property.bedrooms")}
             </Text>
           </View>
         )}
         {item.details.bathrooms !== undefined && (
           <View style={styles.detailItem}>
-            <Ionicons name="water-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="water-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.detailText}>
-              {item.details.bathrooms} {item.details.bathrooms === 1 ? t('property.bathroom') : t('property.bathrooms')}
+              {item.details.bathrooms}{" "}
+              {item.details.bathrooms === 1
+                ? t("property.bathroom")
+                : t("property.bathrooms")}
             </Text>
           </View>
         )}
         {item.details.year !== undefined && (
           <View style={styles.detailItem}>
-            <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.detailText}>{item.details.year}</Text>
           </View>
         )}
         {item.details.mileage !== undefined && (
           <View style={styles.detailItem}>
-            <Ionicons name="speedometer-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="speedometer-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.detailText}>{item.details.mileage} km</Text>
           </View>
         )}
@@ -212,36 +262,55 @@ const ItemSummary = ({ item, offersCount, t }: { item: any; offersCount: number;
   </View>
 );
 
-const OfferCard = ({ offer, onAccept, onDecline, t }: { offer: Offer; onAccept: () => void; onDecline: () => void; t: any }) => {
-  if (offer.status === 'declined') return null;
+const OfferCard = ({
+  offer,
+  onAccept,
+  onDecline,
+  t,
+}: {
+  offer: Offer;
+  onAccept: () => void;
+  onDecline: () => void;
+  t: any;
+}) => {
+  if (offer.status === "declined") return null;
 
   return (
     <View style={styles.card}>
       <View style={styles.buyerRow}>
-        <Image source={{ uri: offer.buyer.avatar }} style={styles.avatar} contentFit="cover" />
+        <Image
+          source={{ uri: offer.buyer.avatar }}
+          style={styles.avatar}
+          contentFit="cover"
+        />
         <View style={styles.buyerInfo}>
-          <Text style={styles.buyerName}>{offer.buyer.fullName || `${offer.buyer.firstName} ${offer.buyer.lastName}`}</Text>
-          {offer.status === 'accepted' ? (
-            <Text style={styles.acceptedText}>{t('offers.accepted')} ✓</Text>
+          <Text style={styles.buyerName}>
+            {offer.buyer.fullName ||
+              `${offer.buyer.firstName} ${offer.buyer.lastName}`}
+          </Text>
+          {offer.status === "accepted" ? (
+            <Text style={styles.acceptedText}>{t("offers.accepted")} ✓</Text>
           ) : (
-            <Text style={styles.messageText}>{offer.message || t('offers.readyToNegotiate')}</Text>
+            <Text style={styles.messageText}>
+              {offer.message || t("offers.readyToNegotiate")}
+            </Text>
           )}
         </View>
       </View>
 
-      {offer.status === 'pending' ? (
+      {offer.status === "pending" ? (
         <View style={styles.actions}>
           <TouchableOpacity style={styles.acceptButton} onPress={onAccept}>
-            <Text style={styles.acceptButtonText}>{t('offers.accept')}</Text>
+            <Text style={styles.acceptButtonText}>{t("offers.accept")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.declineButton} onPress={onDecline}>
-            <Text style={styles.declineButtonText}>{t('offers.decline')}</Text>
+            <Text style={styles.declineButtonText}>{t("offers.decline")}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.acceptedContainer}>
           <Text style={styles.acceptedDescription}>
-            {t('offers.acceptedMessage')}
+            {t("offers.acceptedMessage")}
           </Text>
         </View>
       )}
@@ -256,17 +325,17 @@ const styles = StyleSheet.create({
   },
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    paddingTop: Platform.OS === 'android' ? 40 : 15,
+    paddingTop: Platform.OS === "android" ? 40 : 15,
   },
   headerTitle: {
     fontSize: 20,
@@ -284,8 +353,8 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 100,
   },
   emptyText: {
@@ -297,9 +366,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   summaryContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   itemImage: {
     width: 80,
@@ -312,18 +381,18 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   itemName: {
     fontSize: 18,
     fontFamily: Typography.fontFamily.medium,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.textPrimary,
   },
   badge: {
-    backgroundColor: '#FFE5D4',
+    backgroundColor: "#FFE5D4",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -331,7 +400,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 10,
     color: Colors.primary,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   itemPrice: {
     fontSize: 14,
@@ -340,12 +409,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginRight: 15,
   },
   detailText: {
@@ -364,8 +433,8 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   buyerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
   avatar: {
@@ -380,7 +449,7 @@ const styles = StyleSheet.create({
   },
   buyerName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.textPrimary,
     fontFamily: Typography.fontFamily.medium,
   },
@@ -392,40 +461,40 @@ const styles = StyleSheet.create({
   },
   acceptedText: {
     fontSize: 14,
-    color: '#34C759',
-    fontWeight: 'bold',
+    color: "#34C759",
+    fontWeight: "bold",
     marginTop: 2,
   },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 15,
   },
   acceptButton: {
     flex: 1,
-    backgroundColor: '#FF9500',
+    backgroundColor: "#FF9500",
     paddingVertical: 12,
     borderRadius: 25,
-    alignItems: 'center',
+    alignItems: "center",
   },
   acceptButtonText: {
     color: Colors.textWhite,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontFamily: Typography.fontFamily.medium,
   },
   declineButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#FF9500',
+    borderColor: "#FF9500",
     paddingVertical: 12,
     borderRadius: 25,
-    alignItems: 'center',
+    alignItems: "center",
   },
   declineButtonText: {
-    color: '#FF9500',
+    color: "#FF9500",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontFamily: Typography.fontFamily.medium,
   },
   acceptedContainer: {
@@ -433,9 +502,9 @@ const styles = StyleSheet.create({
   },
   acceptedDescription: {
     fontSize: 14,
-    color: '#34C759',
+    color: "#34C759",
     fontFamily: Typography.fontFamily.regular,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 

@@ -12,7 +12,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { CalendarPicker } from "../../components/Ui";
 import { useTranslation } from "../../hooks/useTranslation";
-import { getAvailability, checkDateAvailability, AvailabilityData } from "../../services/bookingService";
+import {
+  getAvailability,
+  checkDateAvailability,
+  AvailabilityData,
+} from "../../services/bookingService";
 
 export default function RentCalendarScreen() {
   const router = useRouter();
@@ -20,23 +24,25 @@ export default function RentCalendarScreen() {
   const params = useLocalSearchParams();
 
   // Extract listing details from params
-  const { 
-    listingId, 
-    listingType, 
-    propertyName, 
-    location, 
+  const {
+    listingId,
+    listingType,
+    propertyName,
+    location,
     pricePerNight,
     propertyImage,
     bedrooms,
     bathrooms,
-    capacity 
+    capacity,
   } = params;
 
   const [selectedStartDate, setSelectedStartDate] = useState(0);
   const [selectedEndDate, setSelectedEndDate] = useState(0);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [availability, setAvailability] = useState<AvailabilityData | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityData | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -73,7 +79,7 @@ export default function RentCalendarScreen() {
       setErrorMessage("");
       const data = await getAvailability(
         listingId as string,
-        listingType as 'property' | 'vehicle'
+        listingType as "property" | "vehicle",
       );
       setAvailability(data);
     } catch (error: any) {
@@ -112,12 +118,12 @@ export default function RentCalendarScreen() {
     if (!availability) return true;
 
     const checkDate = new Date(currentYear, currentMonth - 1, date);
-    const checkDateStr = checkDate.toISOString().split('T')[0];
+    const checkDateStr = checkDate.toISOString().split("T")[0];
 
     // Check if date is in booked ranges
     for (const range of availability.bookedRanges) {
-      const start = new Date(range.startDate).toISOString().split('T')[0];
-      const end = new Date(range.endDate).toISOString().split('T')[0];
+      const start = new Date(range.startDate).toISOString().split("T")[0];
+      const end = new Date(range.endDate).toISOString().split("T")[0];
       if (checkDateStr >= start && checkDateStr <= end) {
         return false;
       }
@@ -125,8 +131,8 @@ export default function RentCalendarScreen() {
 
     // Check if date is in blocked ranges
     for (const range of availability.blockedRanges) {
-      const start = new Date(range.startDate).toISOString().split('T')[0];
-      const end = new Date(range.endDate).toISOString().split('T')[0];
+      const start = new Date(range.startDate).toISOString().split("T")[0];
+      const end = new Date(range.endDate).toISOString().split("T")[0];
       if (checkDateStr >= start && checkDateStr <= end) {
         return false;
       }
@@ -136,8 +142,8 @@ export default function RentCalendarScreen() {
     if (!availability.defaultAvailable) {
       let isInAvailableRange = false;
       for (const range of availability.availableRanges) {
-        const start = new Date(range.startDate).toISOString().split('T')[0];
-        const end = new Date(range.endDate).toISOString().split('T')[0];
+        const start = new Date(range.startDate).toISOString().split("T")[0];
+        const end = new Date(range.endDate).toISOString().split("T")[0];
         if (checkDateStr >= start && checkDateStr <= end) {
           isInAvailableRange = true;
           break;
@@ -213,15 +219,23 @@ export default function RentCalendarScreen() {
 
     try {
       // Format dates for API
-      const startDate = new Date(currentYear, currentMonth - 1, selectedStartDate).toISOString();
-      const endDate = new Date(currentYear, currentMonth - 1, selectedEndDate).toISOString();
+      const startDate = new Date(
+        currentYear,
+        currentMonth - 1,
+        selectedStartDate,
+      ).toISOString();
+      const endDate = new Date(
+        currentYear,
+        currentMonth - 1,
+        selectedEndDate,
+      ).toISOString();
 
       // Validate with backend
       const result = await checkDateAvailability(
         listingId as string,
-        listingType as 'property' | 'vehicle',
+        listingType as "property" | "vehicle",
         startDate,
-        endDate
+        endDate,
       );
 
       if (!result.available) {
@@ -233,7 +247,9 @@ export default function RentCalendarScreen() {
       if (availability?.minRentalDays) {
         const duration = selectedEndDate - selectedStartDate + 1;
         if (duration < availability.minRentalDays) {
-          setErrorMessage(`Minimum rental period is ${availability.minRentalDays} days`);
+          setErrorMessage(
+            `Minimum rental period is ${availability.minRentalDays} days`,
+          );
           return;
         }
       }
@@ -242,7 +258,9 @@ export default function RentCalendarScreen() {
       if (availability?.maxRentalDays) {
         const duration = selectedEndDate - selectedStartDate + 1;
         if (duration > availability.maxRentalDays) {
-          setErrorMessage(`Maximum rental period is ${availability.maxRentalDays} days`);
+          setErrorMessage(
+            `Maximum rental period is ${availability.maxRentalDays} days`,
+          );
           return;
         }
       }
@@ -283,7 +301,9 @@ export default function RentCalendarScreen() {
           <Ionicons name="arrow-back" size={24} color="#333333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {listingType === 'vehicle' ? t("bookings.selectRentalDates") : t("bookings.selectDates")}
+          {listingType === "vehicle"
+            ? t("bookings.selectRentalDates")
+            : t("bookings.selectDates")}
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -340,7 +360,7 @@ export default function RentCalendarScreen() {
                 <View style={styles.dateRangeDisplay}>
                   <View style={styles.dateItem}>
                     <Text style={styles.dateLabel}>
-                      {listingType === 'vehicle'
+                      {listingType === "vehicle"
                         ? t("bookings.pickupDate")
                         : t("bookings.checkIn")}
                     </Text>
@@ -356,7 +376,7 @@ export default function RentCalendarScreen() {
                   {selectedEndDate > 0 && (
                     <View style={styles.dateItem}>
                       <Text style={styles.dateLabel}>
-                        {listingType === 'vehicle'
+                        {listingType === "vehicle"
                           ? t("bookings.returnDate")
                           : t("bookings.checkOut")}
                       </Text>
@@ -373,7 +393,8 @@ export default function RentCalendarScreen() {
                 </View>
                 {selectedEndDate > 0 && (
                   <Text style={styles.durationText}>
-                    {selectedEndDate - selectedStartDate + 1} {t("bookings.days")}
+                    {selectedEndDate - selectedStartDate + 1}{" "}
+                    {t("bookings.days")}
                   </Text>
                 )}
               </View>
@@ -382,15 +403,21 @@ export default function RentCalendarScreen() {
             {/* Availability Legend */}
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#FF8C42" }]} />
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#FF8C42" }]}
+                />
                 <Text style={styles.legendText}>Available</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#E0E0E0" }]} />
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#E0E0E0" }]}
+                />
                 <Text style={styles.legendText}>Unavailable</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#4CAF50" }]} />
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#4CAF50" }]}
+                />
                 <Text style={styles.legendText}>Selected</Text>
               </View>
             </View>
@@ -403,7 +430,8 @@ export default function RentCalendarScreen() {
         <TouchableOpacity
           style={[
             styles.continueButton,
-            (!selectedStartDate || !selectedEndDate || isValidating) && styles.disabledButton,
+            (!selectedStartDate || !selectedEndDate || isValidating) &&
+              styles.disabledButton,
           ]}
           onPress={validateAndProceed}
           disabled={!selectedStartDate || !selectedEndDate || isValidating}

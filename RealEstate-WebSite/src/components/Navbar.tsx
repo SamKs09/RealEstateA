@@ -1,19 +1,23 @@
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-type ActivePage = "home" | "properties" | "vehicles" | "dashboard";
+type ActivePage = "home" | "properties" | "vehicles" | "plans";
 
 interface NavbarProps {
   activePage?: ActivePage;
 }
 
-const links: { href: string; label: string; page: ActivePage }[] = [
-  { href: "/", label: "Home", page: "home" },
-  { href: "/properties", label: "Properties", page: "properties" },
-  { href: "/vehicles", label: "Vehicles", page: "vehicles" },
-  { href: "/dashboard", label: "Dashboard", page: "dashboard" },
-];
-
 export default function Navbar({ activePage }: NavbarProps) {
+  const t = useTranslations("nav");
+
+  const links: { href: string; label: string; page: ActivePage }[] = [
+    { href: "/", label: t("home"), page: "home" },
+    { href: "/properties", label: t("properties"), page: "properties" },
+    { href: "/vehicles", label: t("vehicles"), page: "vehicles" },
+    { href: "/plans", label: t("plans"), page: "plans" },
+  ];
+
   return (
     <header className="sticky top-0 z-50 flex justify-center px-4 pt-4 pb-2">
       <nav
@@ -27,7 +31,7 @@ export default function Navbar({ activePage }: NavbarProps) {
           style={{ fontFamily: "var(--font-headline)" }}
         >
           <span className="material-symbols-outlined text-[22px]">diamond</span>
-          Tun Realestate
+          Rentim
         </Link>
 
         {/* Nav Links */}
@@ -48,13 +52,16 @@ export default function Navbar({ activePage }: NavbarProps) {
           ))}
         </ul>
 
-        {/* CTA */}
-        <Link
-          href="/signin"
-          className="bg-[#a33900] text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-[#cc4900] transition-colors"
-        >
-          Sign In
-        </Link>
+        {/* Right: Language Switcher + Sign In */}
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <Link
+            href="/signin"
+            className="bg-[#a33900] text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-[#cc4900] transition-colors"
+          >
+            {t("signIn")}
+          </Link>
+        </div>
       </nav>
     </header>
   );

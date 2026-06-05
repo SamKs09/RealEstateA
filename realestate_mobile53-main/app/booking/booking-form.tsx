@@ -135,7 +135,9 @@ export default function BookingFormScreen() {
             />
           )}
           <View style={styles.listingDetails}>
-            <Text style={styles.listingName}>{propertyName || t("bookings.property") || "Property"}</Text>
+            <Text style={styles.listingName}>
+              {propertyName || t("bookings.property") || "Property"}
+            </Text>
             <View style={styles.locationContainer}>
               <Ionicons name="location-outline" size={14} color="#666666" />
               <Text style={styles.locationText}>{location || "Location"}</Text>
@@ -263,7 +265,10 @@ export default function BookingFormScreen() {
             style={styles.textArea}
             value={specialRequests}
             onChangeText={setSpecialRequests}
-            placeholder={t("bookings.specialRequests") || "Any special requests or requirements?"}
+            placeholder={
+              t("bookings.specialRequests") ||
+              "Any special requests or requirements?"
+            }
             placeholderTextColor="#999999"
             multiline
             numberOfLines={4}

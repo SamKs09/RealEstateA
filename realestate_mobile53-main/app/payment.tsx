@@ -88,16 +88,12 @@ export default function PaymentScreen() {
       // Set default dates if no params
       const today = new Date();
       const tomorrow = new Date(
-        today.getTime() + numberOfNights * 24 * 60 * 60 * 1000
+        today.getTime() + numberOfNights * 24 * 60 * 60 * 1000,
       );
       setCheckInDate(formatDate(today.toDateString()));
       setCheckOutDate(formatDate(tomorrow.toDateString()));
     }
   }, [params.checkInDate, params.checkOutDate, numberOfNights]);
-
-
-
-
 
   // const paymentMethods = [
   //   {
@@ -222,13 +218,13 @@ export default function PaymentScreen() {
                 <View style={[styles.circle, styles.redCircle]} />
                 <View style={[styles.circle, styles.yellowCircle]} />
               </View>
-              <Text style={styles.mastercardText}>{t("payment.masterCard")}</Text>
+              <Text style={styles.mastercardText}>
+                {t("payment.masterCard")}
+              </Text>
             </View>
             <Text style={styles.cardDetails}>**** **** **** 7852</Text>
           </View>
         </SectionCard>
-
-
       </ScrollView>
 
       {/* Pay Now Button */}

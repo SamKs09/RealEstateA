@@ -1,73 +1,160 @@
 import Navbar from "@/components/Navbar";
 import Image from "next/image";
-import HeroVideo from "@/components/HeroVideo";
 import Link from "next/link";
+
+// ─────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────
 
 const features = [
   {
     icon: "apartment",
     title: "Property Listings",
-    desc: "Browse curated villas, penthouses, and estates across Tunisia's most prestigious locations.",
+    desc: "Browse villas, apartments, and commercial spaces across Tunisia.",
   },
   {
     icon: "directions_car",
     title: "Vehicle Marketplace",
-    desc: "Discover limited-edition supercars, vintage classics, and bespoke luxury vehicles.",
+    desc: "Buy or rent vehicles with full specs and direct seller contact.",
   },
   {
     icon: "map",
-    title: "Live Map Search",
-    desc: "Explore properties and vehicles with an interactive, real-time map interface.",
+    title: "Map Search",
+    desc: "Explore listings by governorate with interactive search.",
   },
   {
-    icon: "handshake",
-    title: "Smart Negotiations",
-    desc: "Our AI-powered negotiation engine helps you secure the best deal effortlessly.",
+    icon: "calendar_month",
+    title: "Instant Booking",
+    desc: "Book property viewings and vehicle test drives instantly.",
   },
   {
-    icon: "airport_shuttle",
-    title: "Booking & Driver",
-    desc: "Schedule viewings and request a private chauffeur with a single tap.",
+    icon: "rocket_launch",
+    title: "Boost Listings",
+    desc: "Promote your listings for more visibility and faster sales.",
   },
   {
-    icon: "workspace_premium",
-    title: "Curator Credits",
-    desc: "Earn and spend premium credits for exclusive access and priority services.",
+    icon: "chat_bubble",
+    title: "Secure Messaging",
+    desc: "Message buyers and sellers securely inside the app.",
   },
 ];
 
-const steps = [
+const featuredProperties = [
   {
-    num: "01",
-    icon: "search",
-    title: "Browse",
-    desc: "Explore thousands of curated listings tailored to your lifestyle.",
+    id: 1,
+    name: "The Alabaster Atrium",
+    location: "Sidi Bou Saïd · Tunis",
+    price: "4,250,000 TND",
+    beds: 6,
+    baths: 5,
+    sqm: 820,
+    badge: "Sea View",
+    badgeColor: "#005da8",
+    type: "Villa · For Sale",
+    image:
+      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1200&q=80",
   },
   {
-    num: "02",
-    icon: "connect_without_contact",
-    title: "Connect",
-    desc: "Chat directly with sellers, schedule tours, and get AI-assisted guidance.",
+    id: 2,
+    name: "Villa des Dunes",
+    location: "Hammamet · Nabeul",
+    price: "2,450,000 TND",
+    beds: 4,
+    baths: 3,
+    sqm: 520,
+    badge: "Pool",
+    badgeColor: "#a33900",
+    type: "Villa · For Sale",
+    image:
+      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1200&q=80",
   },
   {
-    num: "03",
-    icon: "receipt_long",
-    title: "Transact",
-    desc: "Close deals securely with our verified payment and contract system.",
+    id: 3,
+    name: "Résidence Yasmine",
+    location: "Sousse · Sahel",
+    price: "6,500 TND/mo",
+    beds: 3,
+    baths: 2,
+    sqm: 180,
+    badge: "New",
+    badgeColor: "#007a3d",
+    type: "Apartment · For Rent",
+    image:
+      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&q=80",
   },
 ];
+
+const featuredVehicles = [
+  {
+    id: 1,
+    name: "Porsche 911 GT3 RS",
+    year: "2024",
+    price: "850,000 TND",
+    km: "1,200 km",
+    tag: "For Sale",
+    tagColor: "#a33900",
+    image:
+      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&q=80",
+  },
+  {
+    id: 2,
+    name: "Mercedes S-Class",
+    year: "2023",
+    price: "12,000 TND / mo",
+    km: "0 km",
+    tag: "For Rent",
+    tagColor: "#005da8",
+    image:
+      "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=1200&q=80",
+  },
+  {
+    id: 3,
+    name: "BMW M5 Competition",
+    year: "2023",
+    price: "8,500 TND / mo",
+    km: "5,000 km",
+    tag: "For Rent",
+    tagColor: "#005da8",
+    image:
+      "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=1200&q=80",
+  },
+];
+
+const testimonials = [
+  {
+    name: "Yassine B.",
+    role: "Property Buyer · Tunis",
+    text: "Found my dream apartment in just 3 days.",
+    initials: "YB",
+  },
+  {
+    name: "Leila M.",
+    role: "Real Estate Agent · Sousse",
+    text: "The boost system increased my listing views massively.",
+    initials: "LM",
+  },
+  {
+    name: "Karim T.",
+    role: "Car Dealer · Sfax",
+    text: "Sold multiple vehicles quickly through the platform.",
+    initials: "KT",
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
+// PAGE
+// ─────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="min-h-screen bg-[#f9f9f9]">
       <Navbar activePage="home" />
 
-      {/* ── Hero ── */}
+      {/* HERO */}
       <section
-        className="relative flex-1 overflow-hidden"
+        className="relative overflow-hidden"
         style={{ minHeight: "90vh" }}
       >
-        {/* Gradient background */}
         <div
           className="absolute inset-0"
           style={{
@@ -76,132 +163,107 @@ export default function HomePage() {
           }}
         />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-32 flex flex-col lg:flex-row items-center gap-16">
-          {/* Left — Copy */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-24 pb-24 flex flex-col lg:flex-row items-center gap-16">
+          {/* LEFT */}
           <div className="flex-1 space-y-8">
-            <div className="inline-flex items-center gap-2 glass-card rounded-full px-4 py-2 text-sm font-medium text-white">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-4 py-2 text-sm font-medium text-white">
               <span className="material-symbols-outlined text-[16px]">
                 diamond
               </span>
-              Tunisia&apos;s Premier Luxury Marketplace
+              Tunisia&apos;s Premium Marketplace
             </div>
 
             <h1
-              className="text-4xl md:text-6xl font-extrabold text-white leading-tight"
+              className="text-5xl md:text-7xl font-black text-white leading-tight"
               style={{ fontFamily: "var(--font-headline)" }}
             >
-              Discover Your Dream
+              Find Your Dream
               <br />
               <span className="text-[#370e00]">Home or Car</span>
               <br />
               in Tunisia.
             </h1>
 
-            <p className="text-lg text-white/80 max-w-md leading-relaxed">
-              Architectural masterpieces and bespoke vehicles, curated for those
-              who demand the extraordinary.
+            <p className="text-lg text-white/80 max-w-xl leading-relaxed">
+              Browse premium properties and luxury vehicles across all Tunisian
+              governorates.
             </p>
 
-            {/* CTAs */}
             <div className="flex flex-wrap gap-4">
-              <button className="btn-primary">
-                <span className="whitespace-nowrap flex items-center justify-center">
-                  Download The App
-                </span>
-              </button>
               <a
                 href="#"
-                className="glass-card flex items-center gap-3 px-6 py-3 rounded-2xl text-white font-semibold hover:bg-white/25 transition-colors"
+                className="bg-[#370e00] text-white px-6 py-4 rounded-full font-semibold hover:bg-black transition-colors"
               >
-                <span className="material-symbols-outlined">android</span>
-                Play Store
+                Download App
               </a>
-            </div>
 
-            {/* Social proof */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {["#cc4900", "#a33900", "#7f2b00"].map((c, i) => (
-                  <div
-                    key={i}
-                    className="w-9 h-9 rounded-full border-2 border-white/40 flex items-center justify-center text-white text-xs font-bold"
-                    style={{ background: c }}
-                  >
-                    {String.fromCharCode(65 + i)}
-                  </div>
-                ))}
-                <div className="w-9 h-9 rounded-full border-2 border-white/40 bg-white/20 flex items-center justify-center text-white text-xs font-bold">
-                  +2k
-                </div>
-              </div>
-              <span className="text-sm text-white/80 font-medium">
-                Trusted by 2,000+ discerning buyers
-              </span>
+              <a
+                href="#properties"
+                className="bg-white/20 backdrop-blur-md text-white px-6 py-4 rounded-full font-semibold hover:bg-white/30 transition-colors"
+              >
+                Explore Listings
+              </a>
+
+              <Link
+                href="/plans"
+                className="flex items-center gap-2 bg-[#ffdbce] text-[#a33900] px-6 py-4 rounded-full font-bold shadow-lg hover:bg-[#ffe7d6] transition-colors border-2 border-[#a33900] text-lg"
+                style={{ fontFamily: 'var(--font-headline)', letterSpacing: '0.01em' }}
+              >
+                <span className="material-symbols-outlined text-[22px]">workspace_premium</span>
+                Explore Seller Plans
+              </Link>
             </div>
           </div>
 
-          {/* Right — Hero Video */}
-          <div
-            className="flex-1 relative hidden lg:flex items-center justify-center"
-            style={{ minHeight: "440px" }}
-          >
-            <HeroVideo />
+          {/* RIGHT */}
+          <div className="flex-1">
+            <div className="relative h-[550px] rounded-[2rem] overflow-hidden shadow-2xl">
+              <Image
+                src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=1200&q=80"
+                alt="Luxury Property"
+                fill
+                priority
+                className="object-cover"
+              />
+            </div>
           </div>
-        </div>
-
-        {/* Wave separator */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg
-            viewBox="0 0 1440 80"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M0 80H1440V30C1200 70 900 10 600 50C300 90 100 20 0 40V80Z"
-              fill="#f9f9f9"
-            />
-          </svg>
         </div>
       </section>
 
-      {/* ── Features ── */}
-      <section id="features" className="py-24 px-6 bg-[#f9f9f9]">
+      {/* FEATURES */}
+      <section className="py-24 px-6 bg-[#f9f9f9]">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#a33900]">
-              Why Tun Realestate
-            </p>
+          <div className="text-center mb-16">
             <h2
               className="text-4xl font-bold text-[#1a1c1c]"
               style={{ fontFamily: "var(--font-headline)" }}
             >
-              Everything You Need,
-              <br />
-              <span className="text-[#a33900] italic">
-                Nothing You Don&apos;t.
-              </span>
+              Everything You Need
             </h2>
+
+            <p className="text-[#5b4137] mt-4 max-w-2xl mx-auto">
+              One platform for buyers, renters, sellers, and dealers.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => (
+            {features.map((feature) => (
               <div
-                key={f.title}
-                className="bg-white rounded-3xl p-8 shadow-sm border border-[#e3bfb1]/30 hover:shadow-md hover:-translate-y-1 transition-all"
+                key={feature.title}
+                className="bg-white rounded-3xl p-8 shadow-sm border border-[#e3bfb1]/30 hover:shadow-xl transition-all"
               >
-                <div className="w-12 h-12 rounded-2xl bg-[#ffdbce] flex items-center justify-center mb-5">
+                <div className="w-14 h-14 rounded-2xl bg-[#ffdbce] flex items-center justify-center mb-5">
                   <span className="material-symbols-outlined text-[#a33900]">
-                    {f.icon}
+                    {feature.icon}
                   </span>
                 </div>
-                <h3
-                  className="font-semibold text-[#1a1c1c] mb-2"
-                  style={{ fontFamily: "var(--font-headline)" }}
-                >
-                  {f.title}
+
+                <h3 className="font-bold text-lg text-[#1a1c1c] mb-3">
+                  {feature.title}
                 </h3>
-                <p className="text-sm text-[#5b4137] leading-relaxed">
-                  {f.desc}
+
+                <p className="text-[#5b4137] text-sm leading-relaxed">
+                  {feature.desc}
                 </p>
               </div>
             ))}
@@ -209,161 +271,224 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── App Section ── */}
-      <section id="app" className="py-24 px-6 bg-[#eeeeee]">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16">
-          {/* Phone mockup */}
-          <div className="flex-1 flex justify-center">
-            <div className="relative w-64 h-[480px] bg-[#1a1c1c] rounded-[3rem] p-3 shadow-2xl">
-              <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-1.5 bg-white/20 rounded-full" />
-              <div className="w-full h-full bg-gradient-to-b from-[#F85B00] to-[#a33900] rounded-[2.4rem] overflow-hidden flex flex-col p-5 gap-3">
-                <p className="text-white/60 text-[10px] font-medium uppercase tracking-widest">
-                  Featured
-                </p>
-                <div className="flex-1 bg-white/10 rounded-2xl overflow-hidden relative">
+      {/* PROPERTIES */}
+      <section id="properties" className="py-24 px-6 bg-[#eeeeee]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <h2
+              className="text-4xl font-bold text-[#1a1c1c]"
+              style={{ fontFamily: "var(--font-headline)" }}
+            >
+              Featured Properties
+            </h2>
+
+            <Link href="/properties" className="text-[#a33900] font-semibold">
+              View All
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {featuredProperties.map((property) => (
+              <div
+                key={property.id}
+                className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all"
+              >
+                <div className="relative h-60">
                   <Image
-                    src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=300&q=80"
-                    alt="App preview"
+                    src={property.image}
+                    alt={property.name}
                     fill
-                    className="object-cover opacity-80"
+                    className="object-cover"
+                  />
+
+                  <div className="absolute top-4 left-4">
+                    <span
+                      className="text-white text-xs px-3 py-1 rounded-full font-semibold"
+                      style={{ background: property.badgeColor }}
+                    >
+                      {property.badge}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <h3 className="font-bold text-xl text-[#1a1c1c] mb-2">
+                    {property.name}
+                  </h3>
+
+                  <p className="text-[#8f7065] text-sm mb-4">
+                    {property.location}
+                  </p>
+
+                  <div className="flex gap-4 text-sm text-[#5b4137] mb-5">
+                    <span>{property.beds} Beds</span>
+                    <span>{property.baths} Baths</span>
+                    <span>{property.sqm} m²</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-[#a33900] text-lg">
+                      {property.price}
+                    </p>
+
+                    <button className="bg-[#ffdbce] text-[#a33900] px-4 py-2 rounded-full font-semibold hover:bg-[#a33900] hover:text-white transition-colors">
+                      Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VEHICLES */}
+      <section className="py-24 px-6 bg-[#f9f9f9]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-12">
+            <h2
+              className="text-4xl font-bold text-[#1a1c1c]"
+              style={{ fontFamily: "var(--font-headline)" }}
+            >
+              Featured Vehicles
+            </h2>
+
+            <Link href="/vehicles" className="text-[#a33900] font-semibold">
+              View All
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {featuredVehicles.map((vehicle) => (
+              <div
+                key={vehicle.id}
+                className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all"
+              >
+                <div className="relative h-60">
+                  <Image
+                    src={vehicle.image}
+                    alt={vehicle.name}
+                    fill
+                    className="object-cover"
                   />
                 </div>
-                <div className="bg-white/15 rounded-2xl p-3">
-                  <p className="text-white text-xs font-semibold">
-                    The Alabaster Atrium
-                  </p>
-                  <p className="text-white/70 text-[10px] mt-0.5">
-                    Sidi Bou Saïd · 4.25M TND
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Copy */}
-          <div className="flex-1 space-y-8">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-[#a33900] mb-3">
-                Mobile Experience
-              </p>
-              <h2
-                className="text-4xl font-bold text-[#1a1c1c] leading-tight"
-                style={{ fontFamily: "var(--font-headline)" }}
-              >
-                Your Curator,
-                <br />
-                Always in Your Pocket.
-              </h2>
-            </div>
-            <ul className="space-y-5">
-              {[
-                {
-                  icon: "notifications_active",
-                  text: "Real-time alerts for new listings matching your taste",
-                },
-                {
-                  icon: "chat_bubble",
-                  text: "AI-powered chat assistant to guide every decision",
-                },
-                {
-                  icon: "security",
-                  text: "Secure, end-to-end encrypted negotiations",
-                },
-                {
-                  icon: "offline_bolt",
-                  text: "Browse offline — your saved collections always available",
-                },
-              ].map((item) => (
-                <li key={item.icon} className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#ffdbce] flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[#a33900] text-[20px]">
-                      {item.icon}
+                <div className="p-6">
+                  <p className="text-sm text-[#8f7065] mb-2">
+                    {vehicle.year} · {vehicle.km}
+                  </p>
+
+                  <h3 className="font-bold text-xl text-[#1a1c1c] mb-4">
+                    {vehicle.name}
+                  </h3>
+
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-[#a33900] text-lg">
+                      {vehicle.price}
+                    </p>
+
+                    <span
+                      className="text-white text-xs px-3 py-1 rounded-full font-semibold"
+                      style={{ background: vehicle.tagColor }}
+                    >
+                      {vehicle.tag}
                     </span>
                   </div>
-                  <p className="text-[#5b4137] text-sm leading-relaxed pt-2">
-                    {item.text}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <div className="flex gap-4 pt-2">
-              <a
-                href="#"
-                className="bg-[#a33900] text-white px-6 py-3 rounded-full font-semibold text-sm hover:bg-[#cc4900] transition-colors"
-              >
-                Start Your Journey
-              </a>
-              <a
-                href="#how-it-works"
-                className="border border-[#a33900] text-[#a33900] px-6 py-3 rounded-full font-semibold text-sm hover:bg-[#ffdbce] transition-colors"
-              >
-                Learn More
-              </a>
-            </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── How It Works ── */}
-      <section id="how-it-works" className="py-24 px-6 bg-[#f9f9f9]">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#a33900] mb-3">
-            Simple Process
-          </p>
-          <h2
-            className="text-4xl font-bold text-[#1a1c1c] mb-16"
-            style={{ fontFamily: "var(--font-headline)" }}
-          >
-            From Discovery to Keys in Hand
-          </h2>
+      {/* TESTIMONIALS */}
+      <section className="py-24 px-6 bg-[#eeeeee]">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2
+              className="text-4xl font-bold text-[#1a1c1c]"
+              style={{ fontFamily: "var(--font-headline)" }}
+            >
+              Trusted Across Tunisia
+            </h2>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connecting line */}
-            <div className="hidden md:block absolute top-16 left-1/3 right-1/3 h-0.5 bg-[#e3bfb1]" />
-
-            {steps.map((s) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {testimonials.map((testimonial) => (
               <div
-                key={s.num}
-                className="flex flex-col items-center gap-4 text-center"
+                key={testimonial.name}
+                className="bg-white rounded-3xl p-8 shadow-sm"
               >
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-full bg-[#a33900] flex items-center justify-center shadow-lg">
-                    <span className="material-symbols-outlined text-white">
-                      {s.icon}
+                <div className="flex gap-1 mb-5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="material-symbols-outlined text-[#F85B00]"
+                    >
+                      star
                     </span>
-                  </div>
-                  <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#ffdbce] text-[#a33900] text-xs font-bold flex items-center justify-center stats-font">
-                    {s.num.replace("0", "")}
-                  </span>
+                  ))}
                 </div>
-                <h3
-                  className="text-xl font-bold text-[#1a1c1c]"
-                  style={{ fontFamily: "var(--font-headline)" }}
-                >
-                  {s.title}
-                </h3>
-                <p className="text-sm text-[#5b4137] max-w-xs leading-relaxed">
-                  {s.desc}
+
+                <p className="text-[#5b4137] italic leading-relaxed mb-6">
+                  &ldquo;{testimonial.text}&rdquo;
                 </p>
+
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-[#a33900] text-white flex items-center justify-center font-bold">
+                    {testimonial.initials}
+                  </div>
+
+                  <div>
+                    <p className="font-semibold text-[#1a1c1c]">
+                      {testimonial.name}
+                    </p>
+
+                    <p className="text-sm text-[#8f7065]">{testimonial.role}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-16">
-            <Link
-              href="/properties"
-              className="inline-flex items-center gap-2 bg-[#a33900] text-white px-8 py-4 rounded-full font-semibold hover:bg-[#cc4900] transition-colors shadow-lg"
+      {/* CTA */}
+      <section className="py-24 px-6">
+        <div
+          className="max-w-5xl mx-auto rounded-[2rem] p-14 text-center text-white"
+          style={{
+            background: "linear-gradient(135deg, #a33900 0%, #F85B00 100%)",
+          }}
+        >
+          <h2
+            className="text-5xl font-black mb-6"
+            style={{ fontFamily: "var(--font-headline)" }}
+          >
+            Join Tunisia&apos;s Largest Marketplace
+          </h2>
+
+          <p className="text-white/80 max-w-2xl mx-auto mb-10 text-lg">
+            Buy, rent, sell, and connect faster than ever before.
+          </p>
+
+          <div className="flex flex-wrap justify-center gap-4">
+            <a
+              href="#"
+              className="bg-white text-[#a33900] px-8 py-4 rounded-full font-bold hover:bg-[#ffdbce] transition-colors"
             >
-              Browse Listings
-              <span className="material-symbols-outlined text-[18px]">
-                arrow_forward
-              </span>
+              Download App
+            </a>
+
+            <Link
+              href="/plans"
+              className="border border-white/40 px-8 py-4 rounded-full font-bold hover:bg-white/10 transition-colors"
+            >
+              View Plans
             </Link>
           </div>
         </div>
       </section>
-
-      {/* Footer is rendered globally in the layout */}
     </div>
   );
 }

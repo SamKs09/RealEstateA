@@ -68,11 +68,18 @@ export default function ManageAvailabilityScreen() {
   // ─────────────────────────────────────────────
 
   const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString(i18n.language === "ar" ? "ar-TN" : (i18n.language === "fr" ? "fr-FR" : "en-US"), {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    new Date(iso).toLocaleDateString(
+      i18n.language === "ar"
+        ? "ar-TN"
+        : i18n.language === "fr"
+          ? "fr-FR"
+          : "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      },
+    );
 
   const dayToISO = (day: number, month: number, year: number) =>
     new Date(year, month - 1, day).toISOString();
@@ -148,7 +155,10 @@ export default function ManageAvailabilityScreen() {
     today.setHours(0, 0, 0, 0);
 
     if (selected < today) {
-      Alert.alert(t("bookings.availability.invalidDate"), t("bookings.availability.cannotBlockPast"));
+      Alert.alert(
+        t("bookings.availability.invalidDate"),
+        t("bookings.availability.cannotBlockPast"),
+      );
       return;
     }
 
@@ -239,11 +249,17 @@ export default function ManageAvailabilityScreen() {
     const max = maxRentalDays ? parseInt(maxRentalDays, 10) : undefined;
 
     if (min !== undefined && isNaN(min)) {
-      Alert.alert(t("bookings.availability.invalidInput"), t("bookings.availability.minDaysNumberError"));
+      Alert.alert(
+        t("bookings.availability.invalidInput"),
+        t("bookings.availability.minDaysNumberError"),
+      );
       return;
     }
     if (max !== undefined && isNaN(max)) {
-      Alert.alert(t("bookings.availability.invalidInput"), t("bookings.availability.maxDaysNumberError"));
+      Alert.alert(
+        t("bookings.availability.invalidInput"),
+        t("bookings.availability.maxDaysNumberError"),
+      );
       return;
     }
     if (min !== undefined && max !== undefined && min > max) {
@@ -263,11 +279,16 @@ export default function ManageAvailabilityScreen() {
         minRentalDays: min,
         maxRentalDays: max,
       });
-      Alert.alert(t("bookings.availability.saved"), t("bookings.availability.successMessage"), [
-        { text: t("ok"), onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        t("bookings.availability.saved"),
+        t("bookings.availability.successMessage"),
+        [{ text: t("ok"), onPress: () => router.back() }],
+      );
     } catch (e: any) {
-      Alert.alert(t("error"), e.message || t("bookings.availability.couldNotLoad"));
+      Alert.alert(
+        t("error"),
+        e.message || t("bookings.availability.couldNotLoad"),
+      );
     } finally {
       setSaving(false);
     }
@@ -296,7 +317,9 @@ export default function ManageAvailabilityScreen() {
           <Ionicons name="arrow-back" size={22} color="#1A1A1A" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{t("bookings.availability.title")}</Text>
+          <Text style={styles.headerTitle}>
+            {t("bookings.availability.title")}
+          </Text>
           {listingTitle ? (
             <Text style={styles.headerSub} numberOfLines={1}>
               {listingTitle}
@@ -313,7 +336,9 @@ export default function ManageAvailabilityScreen() {
       >
         {/* ── Default availability ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t("bookings.availability.defaultAvailability")}</Text>
+          <Text style={styles.cardTitle}>
+            {t("bookings.availability.defaultAvailability")}
+          </Text>
           <View style={styles.switchRow}>
             <View style={styles.switchLabelWrap}>
               <Ionicons
@@ -323,7 +348,9 @@ export default function ManageAvailabilityScreen() {
                 style={{ marginRight: 8 }}
               />
               <Text style={styles.switchLabel}>
-                {defaultAvailable ? t("bookings.availability.openByDefault") : t("bookings.availability.closedByDefault")}
+                {defaultAvailable
+                  ? t("bookings.availability.openByDefault")
+                  : t("bookings.availability.closedByDefault")}
               </Text>
             </View>
             <Switch
@@ -342,10 +369,14 @@ export default function ManageAvailabilityScreen() {
 
         {/* ── Rental duration ── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t("bookings.availability.rentalDuration")}</Text>
+          <Text style={styles.cardTitle}>
+            {t("bookings.availability.rentalDuration")}
+          </Text>
           <View style={styles.durationRow}>
             <View style={styles.durationField}>
-              <Text style={styles.durationLabel}>{t("bookings.availability.minDays")}</Text>
+              <Text style={styles.durationLabel}>
+                {t("bookings.availability.minDays")}
+              </Text>
               <TextInput
                 style={styles.durationInput}
                 value={minRentalDays}
@@ -358,7 +389,9 @@ export default function ManageAvailabilityScreen() {
             </View>
             <View style={styles.durationSep} />
             <View style={styles.durationField}>
-              <Text style={styles.durationLabel}>{t("bookings.availability.maxDays")}</Text>
+              <Text style={styles.durationLabel}>
+                {t("bookings.availability.maxDays")}
+              </Text>
               <TextInput
                 style={styles.durationInput}
                 value={maxRentalDays}
@@ -375,14 +408,18 @@ export default function ManageAvailabilityScreen() {
         {/* ── Blocked dates ── */}
         <View style={styles.card}>
           <View style={styles.cardTitleRow}>
-            <Text style={styles.cardTitle}>{t("bookings.availability.blockedDates")}</Text>
+            <Text style={styles.cardTitle}>
+              {t("bookings.availability.blockedDates")}
+            </Text>
             {!addingRange && (
               <TouchableOpacity
                 style={styles.addRangeBtn}
                 onPress={() => setAddingRange(true)}
               >
                 <Ionicons name="add-circle-outline" size={18} color="#FF8C42" />
-                <Text style={styles.addRangeBtnText}>{t("bookings.availability.addRange")}</Text>
+                <Text style={styles.addRangeBtnText}>
+                  {t("bookings.availability.addRange")}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -438,7 +475,9 @@ export default function ManageAvailabilityScreen() {
                     resetCalSelection();
                   }}
                 >
-                  <Text style={styles.calCancelText}>{t("bookings.availability.calendarCancel")}</Text>
+                  <Text style={styles.calCancelText}>
+                    {t("bookings.availability.calendarCancel")}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
@@ -448,7 +487,9 @@ export default function ManageAvailabilityScreen() {
                   onPress={handleAddRange}
                   disabled={!rangeStartDay}
                 >
-                  <Text style={styles.calAddText}>{t("bookings.availability.addRange")}</Text>
+                  <Text style={styles.calAddText}>
+                    {t("bookings.availability.addRange")}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -458,9 +499,13 @@ export default function ManageAvailabilityScreen() {
         {/* ── Availability preview ── */}
         <View style={styles.card}>
           <View style={styles.cardTitleRow}>
-            <Text style={styles.cardTitle}>{t("bookings.availability.availabilityPreview")}</Text>
+            <Text style={styles.cardTitle}>
+              {t("bookings.availability.availabilityPreview")}
+            </Text>
             <View style={styles.previewBadge}>
-              <Text style={styles.previewBadgeText}>{t("bookings.availability.readOnly")}</Text>
+              <Text style={styles.previewBadgeText}>
+                {t("bookings.availability.readOnly")}
+              </Text>
             </View>
           </View>
           <Text style={styles.cardHint}>
@@ -480,11 +525,15 @@ export default function ManageAvailabilityScreen() {
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, styles.legendAvailable]} />
-              <Text style={styles.legendText}>{t("bookings.availability.available")}</Text>
+              <Text style={styles.legendText}>
+                {t("bookings.availability.available")}
+              </Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, styles.legendUnavailable]} />
-              <Text style={styles.legendText}>{t("bookings.availability.unavailable")}</Text>
+              <Text style={styles.legendText}>
+                {t("bookings.availability.unavailable")}
+              </Text>
             </View>
           </View>
         </View>
@@ -504,7 +553,9 @@ export default function ManageAvailabilityScreen() {
                 size={20}
                 color="#fff"
               />
-              <Text style={styles.saveBtnText}>{t("bookings.availability.saveChanges")}</Text>
+              <Text style={styles.saveBtnText}>
+                {t("bookings.availability.saveChanges")}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -542,7 +593,13 @@ const styles = StyleSheet.create({
   },
   headerCenter: { flex: 1, alignItems: "center" },
   headerTitle: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333333" },
-  headerSub: { fontSize: 12, color: "#888", marginTop: 2, maxWidth: 200, fontFamily: "raleway-400Regular" },
+  headerSub: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
+    maxWidth: 200,
+    fontFamily: "raleway-400Regular",
+  },
 
   // Scroll
   scrollContent: {
@@ -575,7 +632,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 14,
   },
-  cardHint: { fontSize: 12, color: "#999", marginTop: 10, lineHeight: 17, fontFamily: "raleway-400Regular" },
+  cardHint: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 10,
+    lineHeight: 17,
+    fontFamily: "raleway-400Regular",
+  },
 
   // Switch row
   switchRow: {
@@ -584,7 +647,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   switchLabelWrap: { flexDirection: "row", alignItems: "center" },
-  switchLabel: { fontSize: 15, color: "#333", fontWeight: "500", fontFamily: "raleway-500Medium" },
+  switchLabel: {
+    fontSize: 15,
+    color: "#333",
+    fontWeight: "500",
+    fontFamily: "raleway-500Medium",
+  },
 
   // Duration
   durationRow: { flexDirection: "row", alignItems: "center" },
@@ -613,7 +681,12 @@ const styles = StyleSheet.create({
 
   // Blocked ranges list
   addRangeBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  addRangeBtnText: { color: "#FF8C42", fontSize: 13, fontWeight: "600", fontFamily: "raleway-600SemiBold" },
+  addRangeBtnText: {
+    color: "#FF8C42",
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: "raleway-600SemiBold",
+  },
   noRangesText: {
     fontSize: 13,
     color: "#BBB",
@@ -629,7 +702,12 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F5F5F5",
     gap: 8,
   },
-  rangeText: { flex: 1, fontSize: 13, color: "#444", fontFamily: "raleway-400Regular" },
+  rangeText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#444",
+    fontFamily: "raleway-400Regular",
+  },
   removeBtn: { padding: 4 },
 
   // Calendar section
@@ -655,7 +733,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#DDD",
   },
-  calCancelText: { color: "#888", fontWeight: "600", fontSize: 14, fontFamily: "raleway-600SemiBold" },
+  calCancelText: {
+    color: "#888",
+    fontWeight: "600",
+    fontSize: 14,
+    fontFamily: "raleway-600SemiBold",
+  },
   calAddBtn: {
     flex: 1,
     backgroundColor: "#FF8C42",
@@ -664,7 +747,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   calAddBtnDisabled: { backgroundColor: "#FFD4B5" },
-  calAddText: { color: "#fff", fontWeight: "700", fontSize: 14, fontFamily: "raleway-700Bold" },
+  calAddText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+    fontFamily: "raleway-700Bold",
+  },
 
   // Save button
   saveBtn: {
@@ -678,7 +766,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   saveBtnDisabled: { backgroundColor: "#FFD4B5" },
-  saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "raleway-700Bold" },
+  saveBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "raleway-700Bold",
+  },
 
   // Preview legend
   legendRow: {
@@ -700,5 +793,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  previewBadgeText: { fontSize: 11, color: "#999", fontWeight: "600", fontFamily: "raleway-600SemiBold" },
+  previewBadgeText: {
+    fontSize: 11,
+    color: "#999",
+    fontWeight: "600",
+    fontFamily: "raleway-600SemiBold",
+  },
 });

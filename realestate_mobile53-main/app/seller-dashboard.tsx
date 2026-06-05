@@ -17,7 +17,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { useInterest } from "../contexts/InterestContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { HeaderWithBackButton } from "../components/Ui/HeaderWithBackButton";
-import { getMyListings, archiveProperty, Property } from "../services/propertyService";
+import {
+  getMyListings,
+  archiveProperty,
+  Property,
+} from "../services/propertyService";
 import * as vehicleService from "../services/vehicleService";
 import { archiveVehicle } from "../services/vehicleService";
 import { getOwnerBookings, BookingData } from "../services/bookingService";
@@ -36,7 +40,7 @@ export default function SellerDashboardScreen() {
   const { user } = useAuth();
   const { userInterest, activeView, isBothMode } = useInterest();
   const { t } = useTranslation();
-  
+
   const [activeTab, setActiveTab] = useState<ListingStatus>("all");
   const [properties, setProperties] = useState<Property[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -52,22 +56,25 @@ export default function SellerDashboardScreen() {
   // Determine display mode
   const displayMode = isBothMode ? activeView : userInterest;
 
-  const isBookedToday = useCallback((listingId: string): boolean => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    return ownerBookings.some((b) => {
-      if (b.status !== "accepted") return false;
-      const refId =
-        displayMode === "cars"
-          ? b.vehicle?._id || b.vehicle?.id
-          : b.property?._id || b.property?.id;
-      if (refId !== listingId) return false;
-      const start = new Date(b.startDate);
-      const end = new Date(b.endDate);
-      end.setHours(23, 59, 59, 999);
-      return today >= start && today <= end;
-    });
-  }, [ownerBookings, displayMode]);
+  const isBookedToday = useCallback(
+    (listingId: string): boolean => {
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      return ownerBookings.some((b) => {
+        if (b.status !== "accepted") return false;
+        const refId =
+          displayMode === "cars"
+            ? b.vehicle?._id || b.vehicle?.id
+            : b.property?._id || b.property?.id;
+        if (refId !== listingId) return false;
+        const start = new Date(b.startDate);
+        const end = new Date(b.endDate);
+        end.setHours(23, 59, 59, 999);
+        return today >= start && today <= end;
+      });
+    },
+    [ownerBookings, displayMode],
+  );
 
   const fetchListings = useCallback(async () => {
     try {
@@ -119,37 +126,45 @@ export default function SellerDashboardScreen() {
   useFocusEffect(
     React.useCallback(() => {
       fetchListings();
-    }, [fetchListings])
+    }, [fetchListings]),
   );
 
   const allListings = displayMode === "cars" ? vehicles : properties;
 
   const archivedCount = useMemo(
     () => allListings.filter((item: any) => item.status === "archived").length,
-    [allListings]
+    [allListings],
   );
 
   // Keep stats.pending in sync
-  const displayStats = useMemo(() => ({
-    ...stats,
-    pending: archivedCount,
-  }), [stats, archivedCount]);
+  const displayStats = useMemo(
+    () => ({
+      ...stats,
+      pending: archivedCount,
+    }),
+    [stats, archivedCount],
+  );
 
   const getFilteredListings = () => {
-    if (activeTab === "all") return allListings.filter((item: any) => item.status !== "archived");
-    if (activeTab === "active") return allListings.filter((item: any) => item.isPromoted === true && item.status !== "archived");
-    if (activeTab === "pending") return allListings.filter((item: any) => item.status === "archived");
+    if (activeTab === "all")
+      return allListings.filter((item: any) => item.status !== "archived");
+    if (activeTab === "active")
+      return allListings.filter(
+        (item: any) => item.isPromoted === true && item.status !== "archived",
+      );
+    if (activeTab === "pending")
+      return allListings.filter((item: any) => item.status === "archived");
     return allListings;
   };
 
   const handleArchive = (id: string, title: string) => {
     Alert.alert(
-      t('sellerDashboard.archiveTitle'),
-      t('sellerDashboard.archiveConfirm', { title }),
+      t("sellerDashboard.archiveTitle"),
+      t("sellerDashboard.archiveConfirm", { title }),
       [
-        { text: t('sellerDashboard.cancel'), style: "cancel" },
+        { text: t("sellerDashboard.cancel"), style: "cancel" },
         {
-          text: t('sellerDashboard.archiveButton'),
+          text: t("sellerDashboard.archiveButton"),
           onPress: async () => {
             try {
               if (displayMode === "cars") {
@@ -159,35 +174,49 @@ export default function SellerDashboardScreen() {
               }
               fetchListings();
             } catch {
-              Alert.alert("Error", t('sellerDashboard.archiveFailed'));
+              Alert.alert("Error", t("sellerDashboard.archiveFailed"));
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":   return "#4CAF50";
-      case "inactive": return "#FF9800";
-      case "pending":  return "#FF9800";
-      case "sold":     return "#9E9E9E";
-      case "rented":   return "#007AFF";
-      case "archived": return "#8E8E93";
-      default:         return "#4CAF50";
+      case "active":
+        return "#4CAF50";
+      case "inactive":
+        return "#FF9800";
+      case "pending":
+        return "#FF9800";
+      case "sold":
+        return "#9E9E9E";
+      case "rented":
+        return "#007AFF";
+      case "archived":
+        return "#8E8E93";
+      default:
+        return "#4CAF50";
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "active":   return t('sellerDashboard.statusActive');
-      case "inactive": return t('sellerDashboard.statusInactive');
-      case "pending":  return t('sellerDashboard.statusPending');
-      case "sold":     return t('sellerDashboard.statusSold');
-      case "rented":   return t('sellerDashboard.statusRented');
-      case "archived": return t('sellerDashboard.statusArchived');
-      default:         return t('sellerDashboard.statusActive');
+      case "active":
+        return t("sellerDashboard.statusActive");
+      case "inactive":
+        return t("sellerDashboard.statusInactive");
+      case "pending":
+        return t("sellerDashboard.statusPending");
+      case "sold":
+        return t("sellerDashboard.statusSold");
+      case "rented":
+        return t("sellerDashboard.statusRented");
+      case "archived":
+        return t("sellerDashboard.statusArchived");
+      default:
+        return t("sellerDashboard.statusActive");
     }
   };
 
@@ -205,24 +234,26 @@ export default function SellerDashboardScreen() {
   const renderListingItem = (item: any, index: number) => {
     const imageUri = item.media?.images?.[0] || "";
     const fullImageUri = imageUri ? getFullImageUrl(imageUri) : null;
-    const placeholderImage = displayMode === "cars" 
-      ? require("../assets/images/Cars/Bmx6.webp")
-      : require("../assets/images/ScreensImages/ProfileComplete.png");
+    const placeholderImage =
+      displayMode === "cars"
+        ? require("../assets/images/Cars/Bmx6.webp")
+        : require("../assets/images/ScreensImages/ProfileComplete.png");
 
-    const price = displayMode === "cars" 
-      ? item.pricing?.salePrice || item.pricing?.rentPrice
-      : item.pricing?.salePrice || item.pricing?.rentPrice;
+    const price =
+      displayMode === "cars"
+        ? item.pricing?.salePrice || item.pricing?.rentPrice
+        : item.pricing?.salePrice || item.pricing?.rentPrice;
 
-    const location = item.location?.city || item.location?.address || "Location";
+    const location =
+      item.location?.city || item.location?.address || "Location";
     const itemId = item.id || item._id;
-    const itemTitle = item.title || (displayMode === "cars" ? item.make + " " + item.model : "Property");
+    const itemTitle =
+      item.title ||
+      (displayMode === "cars" ? item.make + " " + item.model : "Property");
     const itemType = displayMode === "cars" ? "vehicle" : "property";
 
     return (
-      <View
-        key={`${itemId}-${index}`}
-        style={styles.listingItem}
-      >
+      <View key={`${itemId}-${index}`} style={styles.listingItem}>
         <TouchableOpacity
           style={styles.listingContent}
           onPress={() => {
@@ -243,33 +274,40 @@ export default function SellerDashboardScreen() {
             source={fullImageUri ? { uri: fullImageUri } : placeholderImage}
             style={styles.listingImage}
           />
-          
+
           <View style={styles.listingInfo}>
             <View style={styles.listingHeader}>
               <Text style={styles.listingTitle} numberOfLines={1}>
                 {itemTitle}
               </Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || "active") }]}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(item.status || "active") },
+                ]}
+              >
                 <Text style={styles.statusText}>
                   {getStatusText(item.status || "active")}
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.locationRow}>
               <Ionicons name="location-outline" size={14} color="#8A8A8A" />
               <Text style={styles.locationText} numberOfLines={1}>
                 {location}
               </Text>
             </View>
-            
+
             <Text style={styles.priceText}>
-              {price ? `${price.toLocaleString()} DT` : t('sellerDashboard.priceOnRequest')}
-              {item.listingType === "rent" && t('sellerDashboard.perMonth')}
+              {price
+                ? `${price.toLocaleString()} DT`
+                : t("sellerDashboard.priceOnRequest")}
+              {item.listingType === "rent" && t("sellerDashboard.perMonth")}
             </Text>
           </View>
         </TouchableOpacity>
-        
+
         <View style={styles.listingActionColumn}>
           <TouchableOpacity
             style={styles.boostActionButton}
@@ -288,7 +326,7 @@ export default function SellerDashboardScreen() {
             onPress={() => {
               router.push({
                 pathname: "/listing-analytics",
-                params: { 
+                params: {
                   id: itemId,
                   title: itemTitle,
                   type: itemType,
@@ -313,13 +351,13 @@ export default function SellerDashboardScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <HeaderWithBackButton 
-          title={t('sellerDashboard.title')}
-          onBackPress={() => router.back()} 
+        <HeaderWithBackButton
+          title={t("sellerDashboard.title")}
+          onBackPress={() => router.back()}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B35" />
-          <Text style={styles.loadingText}>{t('sellerDashboard.loading')}</Text>
+          <Text style={styles.loadingText}>{t("sellerDashboard.loading")}</Text>
         </View>
       </View>
     );
@@ -327,11 +365,11 @@ export default function SellerDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <HeaderWithBackButton 
-        title={t('sellerDashboard.title')}
-        onBackPress={() => router.back()} 
+      <HeaderWithBackButton
+        title={t("sellerDashboard.title")}
+        onBackPress={() => router.back()}
       />
-      
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -343,10 +381,15 @@ export default function SellerDashboardScreen() {
         <View style={styles.promoBanner}>
           <View style={styles.promoTopRow}>
             <View style={styles.promoTextBlock}>
-              <Text style={styles.promoHeadline}>{t('sellerDashboard.promoHeadline')}</Text>
+              <Text style={styles.promoHeadline}>
+                {t("sellerDashboard.promoHeadline")}
+              </Text>
               <Text style={styles.promoSub}>
-                {t('sellerDashboard.promoSub')}{" "}
-                <Text style={styles.promoHighlight}>{t('sellerDashboard.promoHighlight')}</Text>{" "}{t('sellerDashboard.promoSubEnd')}
+                {t("sellerDashboard.promoSub")}{" "}
+                <Text style={styles.promoHighlight}>
+                  {t("sellerDashboard.promoHighlight")}
+                </Text>{" "}
+                {t("sellerDashboard.promoSubEnd")}
               </Text>
             </View>
             <View style={styles.promoRocketWrap}>
@@ -356,8 +399,12 @@ export default function SellerDashboardScreen() {
 
           <View style={styles.promoStatsRow}>
             <View style={styles.promoStat}>
-              <Text style={styles.promoStatValue}>{user?.boost?.number ?? 0}</Text>
-              <Text style={styles.promoStatLabel}>{t('sellerDashboard.boostsLeft')}</Text>
+              <Text style={styles.promoStatValue}>
+                {user?.boost?.number ?? 0}
+              </Text>
+              <Text style={styles.promoStatLabel}>
+                {t("sellerDashboard.boostsLeft")}
+              </Text>
             </View>
             <View style={styles.promoStatDivider} />
             <View style={styles.promoStat}>
@@ -365,14 +412,18 @@ export default function SellerDashboardScreen() {
                 {(user?.pack || "freemium").charAt(0).toUpperCase() +
                   (user?.pack || "freemium").slice(1)}
               </Text>
-              <Text style={styles.promoStatLabel}>{t('sellerDashboard.currentPlan')}</Text>
+              <Text style={styles.promoStatLabel}>
+                {t("sellerDashboard.currentPlan")}
+              </Text>
             </View>
             <View style={styles.promoStatDivider} />
             <View style={styles.promoStat}>
               <Text style={styles.promoStatValue}>
                 {user?.listingConfig?.number || 1}
               </Text>
-              <Text style={styles.promoStatLabel}>{t('sellerDashboard.listingSlots')}</Text>
+              <Text style={styles.promoStatLabel}>
+                {t("sellerDashboard.listingSlots")}
+              </Text>
             </View>
           </View>
 
@@ -382,15 +433,21 @@ export default function SellerDashboardScreen() {
               onPress={() => router.push("/free-trial" as any)}
             >
               <Ionicons name="star-outline" size={15} color="#fff" />
-              <Text style={styles.promoCTAPrimaryText}>{t('sellerDashboard.upgradePlan')}</Text>
+              <Text style={styles.promoCTAPrimaryText}>
+                {t("sellerDashboard.upgradePlan")}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {(user?.boost?.number ?? 0) === 0 && (
             <View style={styles.promoNudge}>
-              <Ionicons name="information-circle-outline" size={14} color="#FF6B35" />
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color="#FF6B35"
+              />
               <Text style={styles.promoNudgeText}>
-                {t('sellerDashboard.noBoostsNudge')}
+                {t("sellerDashboard.noBoostsNudge")}
               </Text>
             </View>
           )}
@@ -398,9 +455,21 @@ export default function SellerDashboardScreen() {
 
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          {renderStatsCard(t('sellerDashboard.statTotal'), displayStats.total, activeTab === "all")}
-          {renderStatsCard(t('sellerDashboard.statBoosted'), displayStats.active, activeTab === "active")}
-          {renderStatsCard(t('sellerDashboard.statArchived'), displayStats.pending, activeTab === "pending")}
+          {renderStatsCard(
+            t("sellerDashboard.statTotal"),
+            displayStats.total,
+            activeTab === "all",
+          )}
+          {renderStatsCard(
+            t("sellerDashboard.statBoosted"),
+            displayStats.active,
+            activeTab === "active",
+          )}
+          {renderStatsCard(
+            t("sellerDashboard.statArchived"),
+            displayStats.pending,
+            activeTab === "pending",
+          )}
         </View>
 
         {/* Filter Tabs */}
@@ -409,26 +478,41 @@ export default function SellerDashboardScreen() {
             style={[styles.tab, activeTab === "all" && styles.activeTab]}
             onPress={() => setActiveTab("all")}
           >
-            <Text style={[styles.tabText, activeTab === "all" && styles.activeTabText]}>
-              {t('sellerDashboard.tabAll')}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "all" && styles.activeTabText,
+              ]}
+            >
+              {t("sellerDashboard.tabAll")}
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.tab, activeTab === "active" && styles.activeTab]}
             onPress={() => setActiveTab("active")}
           >
-            <Text style={[styles.tabText, activeTab === "active" && styles.activeTabText]}>
-              {t('sellerDashboard.tabBoosted')}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "active" && styles.activeTabText,
+              ]}
+            >
+              {t("sellerDashboard.tabBoosted")}
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.tab, activeTab === "pending" && styles.activeTab]}
             onPress={() => setActiveTab("pending")}
           >
-            <Text style={[styles.tabText, activeTab === "pending" && styles.activeTabText]}>
-              {t('sellerDashboard.tabArchived')}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "pending" && styles.activeTabText,
+              ]}
+            >
+              {t("sellerDashboard.tabArchived")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -437,20 +521,24 @@ export default function SellerDashboardScreen() {
         <View style={styles.listingsContainer}>
           {getFilteredListings().length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons 
-                name={displayMode === "cars" ? "car-outline" : "home-outline"} 
-                size={64} 
-                color="#E0E0E0" 
+              <Ionicons
+                name={displayMode === "cars" ? "car-outline" : "home-outline"}
+                size={64}
+                color="#E0E0E0"
               />
               <Text style={styles.emptyTitle}>
-                {activeTab === "all" ? t('sellerDashboard.noListings') : activeTab === "active" ? t('sellerDashboard.noBoostedListings') : t('sellerDashboard.noArchivedListings')}
+                {activeTab === "all"
+                  ? t("sellerDashboard.noListings")
+                  : activeTab === "active"
+                    ? t("sellerDashboard.noBoostedListings")
+                    : t("sellerDashboard.noArchivedListings")}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {activeTab === "pending"
-                  ? t('sellerDashboard.archivedWillAppear')
+                  ? t("sellerDashboard.archivedWillAppear")
                   : displayMode === "cars"
-                  ? t('sellerDashboard.addFirstVehicle')
-                  : t('sellerDashboard.addFirstProperty')}
+                    ? t("sellerDashboard.addFirstVehicle")
+                    : t("sellerDashboard.addFirstProperty")}
               </Text>
               <TouchableOpacity
                 style={styles.addButton}
@@ -463,12 +551,16 @@ export default function SellerDashboardScreen() {
                 }}
               >
                 <Text style={styles.addButtonText}>
-                  {displayMode === "cars" ? t('sellerDashboard.addVehicle') : t('sellerDashboard.addProperty')}
+                  {displayMode === "cars"
+                    ? t("sellerDashboard.addVehicle")
+                    : t("sellerDashboard.addProperty")}
                 </Text>
               </TouchableOpacity>
             </View>
           ) : (
-            getFilteredListings().map((item, index) => renderListingItem(item, index))
+            getFilteredListings().map((item, index) =>
+              renderListingItem(item, index),
+            )
           )}
         </View>
       </ScrollView>

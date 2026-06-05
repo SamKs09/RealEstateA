@@ -47,7 +47,9 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => {
-    let notificationService: Awaited<ReturnType<typeof loadNotificationService>> | null = null;
+    let notificationService: Awaited<
+      ReturnType<typeof loadNotificationService>
+    > | null = null;
     fetchNotifications();
 
     // Listen for new notifications while on this screen
@@ -69,7 +71,7 @@ export default function NotificationsScreen() {
       const notificationService = await loadNotificationService();
       await notificationService.markAsRead(item._id);
       setNotifications((prev) =>
-        prev.map((n) => (n._id === item._id ? { ...n, read: true } : n))
+        prev.map((n) => (n._id === item._id ? { ...n, read: true } : n)),
       );
     }
 
@@ -101,7 +103,10 @@ export default function NotificationsScreen() {
 
       case "property_update":
         if (relatedId) {
-          router.push({ pathname: "/property_info", params: { id: relatedId } });
+          router.push({
+            pathname: "/property_info",
+            params: { id: relatedId },
+          });
         } else {
           router.push("/(tabs)/Explore");
         }
@@ -109,7 +114,10 @@ export default function NotificationsScreen() {
 
       case "follow":
         if (relatedId) {
-          router.push({ pathname: "/seller-profile/[id]", params: { id: relatedId } });
+          router.push({
+            pathname: "/seller-profile/[id]",
+            params: { id: relatedId },
+          });
         }
         break;
 
@@ -136,7 +144,8 @@ export default function NotificationsScreen() {
   const handleClearAll = () => {
     Alert.alert(
       t("notifications.clearAllTitle") || "Clear All",
-      t("notifications.clearAllMessage") || "Are you sure you want to delete all notifications?",
+      t("notifications.clearAllMessage") ||
+        "Are you sure you want to delete all notifications?",
       [
         { text: t("common.cancel") || "Cancel", style: "cancel" },
         {
@@ -148,7 +157,7 @@ export default function NotificationsScreen() {
             setNotifications([]);
           },
         },
-      ]
+      ],
     );
   };
 

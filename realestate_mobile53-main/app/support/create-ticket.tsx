@@ -32,7 +32,7 @@ export default function CreateTicketScreen() {
       const manipResult = await manipulateAsync(
         uri,
         [{ resize: { width: 1024 } }], // Resize to max width of 1024px
-        { compress: 0.7, format: SaveFormat.JPEG }
+        { compress: 0.7, format: SaveFormat.JPEG },
       );
       return manipResult.uri;
     } catch (error) {
@@ -64,7 +64,7 @@ export default function CreateTicketScreen() {
     if (!result.canceled) {
       // Compress all images before adding them
       const compressedUris = await Promise.all(
-        result.assets.map((asset) => compressImage(asset.uri))
+        result.assets.map((asset) => compressImage(asset.uri)),
       );
       setAttachments([...attachments, ...compressedUris]);
     }
@@ -103,7 +103,7 @@ export default function CreateTicketScreen() {
       console.log(
         "📤 Uploading support ticket with",
         attachments.length,
-        "attachments"
+        "attachments",
       );
 
       // Use longer timeout for file uploads (30 seconds)

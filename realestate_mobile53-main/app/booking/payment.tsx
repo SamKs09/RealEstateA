@@ -64,12 +64,12 @@ export default function PaymentScreen() {
         const ciMid = new Date(
           ciDate.getFullYear(),
           ciDate.getMonth(),
-          ciDate.getDate()
+          ciDate.getDate(),
         );
         const coMid = new Date(
           coDate.getFullYear(),
           coDate.getMonth(),
-          coDate.getDate()
+          coDate.getDate(),
         );
         const diffMs = coMid.getTime() - ciMid.getTime();
         const days = Math.round(diffMs / (24 * 60 * 60 * 1000));
@@ -126,14 +126,14 @@ export default function PaymentScreen() {
       const checkIn = new Date(params.checkInDate as string);
       if (!isNaN(checkIn.getTime())) {
         const checkOut = new Date(
-          checkIn.getTime() + numberOfNights * 24 * 60 * 60 * 1000
+          checkIn.getTime() + numberOfNights * 24 * 60 * 60 * 1000,
         );
         setCheckOutDate(formatDate(checkOut.toDateString()));
       } else {
         // Fallback if date parsing fails
         const today = new Date();
         const tomorrow = new Date(
-          today.getTime() + numberOfNights * 24 * 60 * 60 * 1000
+          today.getTime() + numberOfNights * 24 * 60 * 60 * 1000,
         );
         setCheckInDate(formatDate(today.toDateString()));
         setCheckOutDate(formatDate(tomorrow.toDateString()));
@@ -142,7 +142,7 @@ export default function PaymentScreen() {
       // Set default dates if no params
       const today = new Date();
       const tomorrow = new Date(
-        today.getTime() + numberOfNights * 24 * 60 * 60 * 1000
+        today.getTime() + numberOfNights * 24 * 60 * 60 * 1000,
       );
       setCheckInDate(formatDate(today.toDateString()));
       setCheckOutDate(formatDate(tomorrow.toDateString()));
@@ -180,7 +180,7 @@ export default function PaymentScreen() {
 
       // Prepare payment data
       const paymentData = {
-        propertyId: params.propertyId as string || '',
+        propertyId: (params.propertyId as string) || "",
         propertyName: String(propertyName),
         amount: total,
         checkInDate: rawCheckIn || new Date().toISOString(),
@@ -191,14 +191,14 @@ export default function PaymentScreen() {
         leavingTime: String(leavingTime),
       };
 
-      console.log('🔐 Initiating payment:', paymentData);
+      console.log("🔐 Initiating payment:", paymentData);
 
       // Call backend to create Konnect checkout
       const response = await paymentService.initiateBookingPayment(paymentData);
 
       if (response.success && response.data?.checkoutUrl) {
-        console.log('✅ Payment initiated successfully');
-        console.log('🌐 Opening Konnect payment page...');
+        console.log("✅ Payment initiated successfully");
+        console.log("🌐 Opening Konnect payment page...");
 
         // Open Konnect payment page in browser
         const checkoutUrl = response.data.checkoutUrl;
@@ -210,7 +210,8 @@ export default function PaymentScreen() {
           // Show info alert
           Alert.alert(
             t("payment.redirected") || "Payment",
-            t("payment.completePayment") || "Complete your payment in the browser. You can return to the app after payment is completed.",
+            t("payment.completePayment") ||
+              "Complete your payment in the browser. You can return to the app after payment is completed.",
             [
               {
                 text: t("common.ok") || "OK",
@@ -219,21 +220,23 @@ export default function PaymentScreen() {
                   router.push("../(tabs)/Bookings");
                 },
               },
-            ]
+            ],
           );
         } else {
-          throw new Error('Cannot open payment URL');
+          throw new Error("Cannot open payment URL");
         }
       } else {
-        throw new Error(response.message || 'Failed to create payment');
+        throw new Error(response.message || "Failed to create payment");
       }
     } catch (error: any) {
-      console.error('❌ Payment initiation failed:', error);
+      console.error("❌ Payment initiation failed:", error);
 
       Alert.alert(
         t("payment.error") || "Payment Error",
-        error.message || t("payment.errorMessage") || "Failed to process payment. Please try again.",
-        [{ text: t("common.ok") || "OK" }]
+        error.message ||
+          t("payment.errorMessage") ||
+          "Failed to process payment. Please try again.",
+        [{ text: t("common.ok") || "OK" }],
       );
     } finally {
       setIsProcessing(false);
@@ -271,11 +274,15 @@ export default function PaymentScreen() {
               <View style={styles.propertyDetails}>
                 <View style={styles.detailItem}>
                   <Ionicons name="bed-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.detailText}>{params.bedrooms || 0} Bedroom</Text>
+                  <Text style={styles.detailText}>
+                    {params.bedrooms || 0} Bedroom
+                  </Text>
                 </View>
                 <View style={styles.detailItem}>
                   <Ionicons name="water-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.detailText}>{params.bathrooms || 0} Bathroom</Text>
+                  <Text style={styles.detailText}>
+                    {params.bathrooms || 0} Bathroom
+                  </Text>
                 </View>
               </View>
             </View>
@@ -357,13 +364,17 @@ export default function PaymentScreen() {
 
       {/* Pay Now Button */}
       <View style={styles.bottomSection}>
-        <TouchableOpacity 
-          style={[styles.payButton, isProcessing && styles.payButtonDisabled]} 
+        <TouchableOpacity
+          style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
           onPress={handlePayNow}
           disabled={isProcessing}
         >
           <LinearGradient
-            colors={isProcessing ? [Colors.borderLight, Colors.borderLight] : [Colors.primary, Colors.primaryLight]}
+            colors={
+              isProcessing
+                ? [Colors.borderLight, Colors.borderLight]
+                : [Colors.primary, Colors.primaryLight]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.payButtonGradient}

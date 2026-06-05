@@ -133,7 +133,7 @@ export default function EditVehicleScreen() {
       try {
         const response = await getVehicle(vehicleId);
         const vehicle = response.data;
-        
+
         // Map vehicle data to form data
         setFormData({
           title: vehicle.title || "",
@@ -149,10 +149,12 @@ export default function EditVehicleScreen() {
           transmission: vehicle.vehicleDetails?.transmission || "automatic",
           condition: vehicle.vehicleDetails?.condition || "used",
           features: vehicle.vehicleDetails?.features || [],
-          location: vehicle.location?.coordinates ? {
-            latitude: vehicle.location.coordinates.latitude,
-            longitude: vehicle.location.coordinates.longitude
-          } : null,
+          location: vehicle.location?.coordinates
+            ? {
+                latitude: vehicle.location.coordinates.latitude,
+                longitude: vehicle.location.coordinates.longitude,
+              }
+            : null,
           salePrice: vehicle.pricing?.salePrice?.toString() || "",
           rentPrice: vehicle.pricing?.rentPrice?.toString() || "",
           rentPeriod: vehicle.pricing?.rentPeriod || "daily",
@@ -168,7 +170,10 @@ export default function EditVehicleScreen() {
         if (vehicle.location?.address) {
           setLocationAddress(vehicle.location.address);
         } else if (vehicle.location?.coordinates) {
-          getAddressFromCoordinates(vehicle.location.coordinates.latitude, vehicle.location.coordinates.longitude);
+          getAddressFromCoordinates(
+            vehicle.location.coordinates.latitude,
+            vehicle.location.coordinates.longitude,
+          );
         }
 
         setIsLoading(false);
@@ -215,7 +220,8 @@ export default function EditVehicleScreen() {
 
   const handleAddImages = async () => {
     try {
-      const totalImages = formData.existingImages.length + formData.newImages.length;
+      const totalImages =
+        formData.existingImages.length + formData.newImages.length;
       if (totalImages >= 10) {
         Alert.alert("Limit Reached", "You can only have up to 10 images");
         return;
@@ -229,11 +235,13 @@ export default function EditVehicleScreen() {
 
       if (!result.canceled && result.assets) {
         const remainingSlots = 10 - totalImages;
-        const newImages = result.assets.slice(0, remainingSlots).map((asset, index) => ({
-          uri: asset.uri,
-          name: `vehicle_image_${Date.now()}_${index}.jpg`,
-          type: "image/jpeg",
-        }));
+        const newImages = result.assets
+          .slice(0, remainingSlots)
+          .map((asset, index) => ({
+            uri: asset.uri,
+            name: `vehicle_image_${Date.now()}_${index}.jpg`,
+            type: "image/jpeg",
+          }));
 
         setFormData((prev) => ({
           ...prev,
@@ -260,10 +268,13 @@ export default function EditVehicleScreen() {
     }
   };
 
-  const getAddressFromCoordinates = async (latitude: number, longitude: number) => {
+  const getAddressFromCoordinates = async (
+    latitude: number,
+    longitude: number,
+  ) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyAqSchAEdRlw3Rsk17pfI7H4NaWnmiROi4`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyAqSchAEdRlw3Rsk17pfI7H4NaWnmiROi4`,
       );
       const data = await response.json();
       if (data.results && data.results.length > 0) {
@@ -277,7 +288,10 @@ export default function EditVehicleScreen() {
     }
   };
 
-  const handleLocationSelect = async (location: { latitude: number; longitude: number }) => {
+  const handleLocationSelect = async (location: {
+    latitude: number;
+    longitude: number;
+  }) => {
     setFormData((prev) => ({ ...prev, location }));
     await getAddressFromCoordinates(location.latitude, location.longitude);
   };
@@ -320,14 +334,14 @@ export default function EditVehicleScreen() {
     setIsSubmitting(true);
 
     try {
-      const addressParts = locationAddress.split(",").map(p => p.trim());
+      const addressParts = locationAddress.split(",").map((p) => p.trim());
       const city = addressParts[addressParts.length - 2] || "Unknown City";
       const state = addressParts[addressParts.length - 3] || "Unknown State";
 
       // Helper function to convert full URL back to relative path
       const toRelativePath = (url: string) => {
         if (!url) return url;
-        if (url.startsWith('http')) {
+        if (url.startsWith("http")) {
           try {
             const urlObj = new URL(url);
             return urlObj.pathname; // Returns just /uploads/vehicles/images/filename.jpg
@@ -365,9 +379,14 @@ export default function EditVehicleScreen() {
           },
         },
         pricing: {
-          salePrice: formData.salePrice ? parseFloat(formData.salePrice) : undefined,
-          rentPrice: formData.rentPrice ? parseFloat(formData.rentPrice) : undefined,
-          rentPeriod: formData.listingType === "rent" ? formData.rentPeriod : undefined,
+          salePrice: formData.salePrice
+            ? parseFloat(formData.salePrice)
+            : undefined,
+          rentPrice: formData.rentPrice
+            ? parseFloat(formData.rentPrice)
+            : undefined,
+          rentPeriod:
+            formData.listingType === "rent" ? formData.rentPeriod : undefined,
           deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
           currency: formData.currency,
           negotiable: formData.priceNegotiable,
@@ -396,14 +415,20 @@ export default function EditVehicleScreen() {
           console.log("✅ New images uploaded successfully");
         } catch (imageError) {
           console.error("❌ Error uploading images:", imageError);
-          Alert.alert("Warning", "Vehicle updated but some images failed to upload");
+          Alert.alert(
+            "Warning",
+            "Vehicle updated but some images failed to upload",
+          );
         }
       }
 
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error("Error updating vehicle:", error);
-      Alert.alert(t("addHouse.error"), error.message || "Failed to update vehicle");
+      Alert.alert(
+        t("addHouse.error"),
+        error.message || "Failed to update vehicle",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -413,10 +438,29 @@ export default function EditVehicleScreen() {
     <View style={styles.stepIndicator}>
       {[1, 2, 3, 4, 5].map((step, index) => (
         <View key={step} style={styles.stepContainer}>
-          <View style={[styles.stepCircle, currentStep >= step && styles.stepCircleActive]}>
-            <Text style={[styles.stepNumber, currentStep >= step && styles.stepNumberActive]}>{index + 1}</Text>
+          <View
+            style={[
+              styles.stepCircle,
+              currentStep >= step && styles.stepCircleActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepNumber,
+                currentStep >= step && styles.stepNumberActive,
+              ]}
+            >
+              {index + 1}
+            </Text>
           </View>
-          {index < 4 && <View style={[styles.stepLine, currentStep > step && styles.stepLineActive]} />}
+          {index < 4 && (
+            <View
+              style={[
+                styles.stepLine,
+                currentStep > step && styles.stepLineActive,
+              ]}
+            />
+          )}
         </View>
       ))}
     </View>
@@ -437,7 +481,7 @@ export default function EditVehicleScreen() {
   const renderStep1 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>Basic Information</Text>
-      
+
       <View style={styles.inputContainer}>
         <Text style={styles.label}>{t("addProperty.title")} *</Text>
         <TextInput
@@ -466,10 +510,18 @@ export default function EditVehicleScreen() {
           {VEHICLE_TYPES.map((type) => (
             <TouchableOpacity
               key={type.value}
-              style={[styles.chip, formData.type === type.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.type === type.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("type", type.value)}
             >
-              <Text style={[styles.chipText, formData.type === type.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.type === type.value && styles.chipTextSelected,
+                ]}
+              >
                 {type.label}
               </Text>
             </TouchableOpacity>
@@ -483,10 +535,19 @@ export default function EditVehicleScreen() {
           {LISTING_TYPES.map((type) => (
             <TouchableOpacity
               key={type.value}
-              style={[styles.chip, formData.listingType === type.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.listingType === type.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("listingType", type.value)}
             >
-              <Text style={[styles.chipText, formData.listingType === type.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.listingType === type.value &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {type.label}
               </Text>
             </TouchableOpacity>
@@ -499,7 +560,7 @@ export default function EditVehicleScreen() {
   const renderStep2 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>Vehicle Details</Text>
-      
+
       <View style={styles.row}>
         <View style={styles.halfWidth}>
           <Text style={styles.label}>Make</Text>
@@ -560,10 +621,18 @@ export default function EditVehicleScreen() {
           {FUEL_TYPES.map((fuel) => (
             <TouchableOpacity
               key={fuel.value}
-              style={[styles.chip, formData.fuelType === fuel.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.fuelType === fuel.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("fuelType", fuel.value)}
             >
-              <Text style={[styles.chipText, formData.fuelType === fuel.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.fuelType === fuel.value && styles.chipTextSelected,
+                ]}
+              >
                 {fuel.label}
               </Text>
             </TouchableOpacity>
@@ -577,10 +646,19 @@ export default function EditVehicleScreen() {
           {TRANSMISSION_TYPES.map((trans) => (
             <TouchableOpacity
               key={trans.value}
-              style={[styles.chip, formData.transmission === trans.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.transmission === trans.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("transmission", trans.value)}
             >
-              <Text style={[styles.chipText, formData.transmission === trans.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.transmission === trans.value &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {trans.label}
               </Text>
             </TouchableOpacity>
@@ -594,10 +672,18 @@ export default function EditVehicleScreen() {
           {CONDITION_TYPES.map((cond) => (
             <TouchableOpacity
               key={cond.value}
-              style={[styles.chip, formData.condition === cond.value && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.condition === cond.value && styles.chipSelected,
+              ]}
               onPress={() => updateFormData("condition", cond.value)}
             >
-              <Text style={[styles.chipText, formData.condition === cond.value && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.condition === cond.value && styles.chipTextSelected,
+                ]}
+              >
                 {cond.label}
               </Text>
             </TouchableOpacity>
@@ -611,10 +697,19 @@ export default function EditVehicleScreen() {
           {COMMON_FEATURES.map((feature) => (
             <TouchableOpacity
               key={feature}
-              style={[styles.chip, formData.features.includes(feature) && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.features.includes(feature) && styles.chipSelected,
+              ]}
               onPress={() => toggleArrayItem("features", feature)}
             >
-              <Text style={[styles.chipText, formData.features.includes(feature) && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.features.includes(feature) &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {feature}
               </Text>
             </TouchableOpacity>
@@ -623,11 +718,22 @@ export default function EditVehicleScreen() {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Images ({formData.existingImages.length + formData.newImages.length}/10)</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageGallery}>
+        <Text style={styles.label}>
+          Images ({formData.existingImages.length + formData.newImages.length}
+          /10)
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.imageGallery}
+        >
           {formData.existingImages.map((uri, index) => (
             <View key={`existing-${index}`} style={styles.imageContainer}>
-              <Image source={{ uri }} style={styles.imagePreview} contentFit="cover" />
+              <Image
+                source={{ uri }}
+                style={styles.imagePreview}
+                contentFit="cover"
+              />
               <TouchableOpacity
                 style={styles.imageDeleteButton}
                 onPress={() => handleRemoveImage(index, false)}
@@ -638,7 +744,11 @@ export default function EditVehicleScreen() {
           ))}
           {formData.newImages.map((image, index) => (
             <View key={`new-${index}`} style={styles.imageContainer}>
-              <Image source={{ uri: image.uri }} style={styles.imagePreview} contentFit="cover" />
+              <Image
+                source={{ uri: image.uri }}
+                style={styles.imagePreview}
+                contentFit="cover"
+              />
               <View style={styles.newBadge}>
                 <Text style={styles.newBadgeText}>NEW</Text>
               </View>
@@ -650,8 +760,11 @@ export default function EditVehicleScreen() {
               </TouchableOpacity>
             </View>
           ))}
-          {(formData.existingImages.length + formData.newImages.length) < 10 && (
-            <TouchableOpacity style={styles.addImageButton} onPress={handleAddImages}>
+          {formData.existingImages.length + formData.newImages.length < 10 && (
+            <TouchableOpacity
+              style={styles.addImageButton}
+              onPress={handleAddImages}
+            >
               <Ionicons name="add" size={32} color="#FF6B35" />
               <Text style={styles.addImageText}>Add Images</Text>
             </TouchableOpacity>
@@ -664,9 +777,12 @@ export default function EditVehicleScreen() {
   const renderStep3 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>Location</Text>
-      
+
       <TouchableOpacity
-        style={[styles.locationButton, formData.location && styles.locationButtonWithMap]}
+        style={[
+          styles.locationButton,
+          formData.location && styles.locationButtonWithMap,
+        ]}
         onPress={() => setShowMapPicker(true)}
       >
         {formData.location ? (
@@ -697,7 +813,9 @@ export default function EditVehicleScreen() {
         ) : (
           <View style={styles.locationPlaceholder}>
             <Ionicons name="map-outline" size={32} color="#FF6B35" />
-            <Text style={styles.locationPlaceholderText}>Select Location on Map</Text>
+            <Text style={styles.locationPlaceholderText}>
+              Select Location on Map
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -707,7 +825,7 @@ export default function EditVehicleScreen() {
   const renderStep4 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>Pricing</Text>
-      
+
       {formData.listingType === "sale" ? (
         <View style={styles.inputContainer}>
           <Text style={styles.label}>{t("addProperty.salePrice")} (DT) *</Text>
@@ -722,7 +840,9 @@ export default function EditVehicleScreen() {
       ) : (
         <>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>{t("addProperty.rentPrice")} (DT) *</Text>
+            <Text style={styles.label}>
+              {t("addProperty.rentPrice")} (DT) *
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="0.00"
@@ -737,10 +857,19 @@ export default function EditVehicleScreen() {
               {RENT_PERIODS.map((period) => (
                 <TouchableOpacity
                   key={period.value}
-                  style={[styles.chip, formData.rentPeriod === period.value && styles.chipSelected]}
+                  style={[
+                    styles.chip,
+                    formData.rentPeriod === period.value && styles.chipSelected,
+                  ]}
                   onPress={() => updateFormData("rentPeriod", period.value)}
                 >
-                  <Text style={[styles.chipText, formData.rentPeriod === period.value && styles.chipTextSelected]}>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      formData.rentPeriod === period.value &&
+                        styles.chipTextSelected,
+                    ]}
+                  >
                     {period.label}
                   </Text>
                 </TouchableOpacity>
@@ -774,17 +903,26 @@ export default function EditVehicleScreen() {
   const renderStep5 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepHeader}>Additional Features & Rules</Text>
-      
+
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Additional Features</Text>
         <View style={styles.chipContainer}>
           {ADDITIONAL_FEATURES.map((feature) => (
             <TouchableOpacity
               key={feature}
-              style={[styles.chip, formData.features.includes(feature) && styles.chipSelected]}
+              style={[
+                styles.chip,
+                formData.features.includes(feature) && styles.chipSelected,
+              ]}
               onPress={() => toggleArrayItem("features", feature)}
             >
-              <Text style={[styles.chipText, formData.features.includes(feature) && styles.chipTextSelected]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.features.includes(feature) &&
+                    styles.chipTextSelected,
+                ]}
+              >
                 {feature}
               </Text>
             </TouchableOpacity>
@@ -823,8 +961,10 @@ export default function EditVehicleScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <HeaderWithBackButton 
-          onBackPress={() => currentStep > 1 ? setCurrentStep(s => s - 1) : router.back()} 
+        <HeaderWithBackButton
+          onBackPress={() =>
+            currentStep > 1 ? setCurrentStep((s) => s - 1) : router.back()
+          }
         />
         <Text style={styles.headerTitle}>Edit Vehicle</Text>
         <View style={{ width: 40 }} />
@@ -832,7 +972,10 @@ export default function EditVehicleScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -841,12 +984,17 @@ export default function EditVehicleScreen() {
 
         <View style={styles.footer}>
           {currentStep < 5 ? (
-            <TouchableOpacity style={styles.button} onPress={() => {
-              if (validateStep(currentStep)) {
-                setCurrentStep(s => s + 1);
-              }
-            }}>
-              <Text style={styles.buttonText}>{t("addProperty.next") || "Next"}</Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => {
+                if (validateStep(currentStep)) {
+                  setCurrentStep((s) => s + 1);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>
+                {t("addProperty.next") || "Next"}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -854,7 +1002,11 @@ export default function EditVehicleScreen() {
               onPress={handleSubmit}
               disabled={isSubmitting}
             >
-              {isSubmitting ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>Save Changes</Text>}
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.buttonText}>Save Changes</Text>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -891,9 +1043,24 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
   },
-  headerTitle: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333333", marginTop: -10 },
-  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  loadingText: { marginTop: 10, fontSize: 16, fontFamily: "Raleway", color: "#666" },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333333",
+    marginTop: -10,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontFamily: "Raleway",
+    color: "#666",
+  },
   stepIndicator: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -913,13 +1080,28 @@ const styles = StyleSheet.create({
   stepCircleActive: { backgroundColor: "#FF6B35" },
   stepNumber: { fontSize: 14, color: "#999", fontFamily: "Raleway-Bold" },
   stepNumberActive: { color: "#FFF" },
-  stepLine: { width: 30, height: 2, backgroundColor: "#F0F0F0", marginHorizontal: 4 },
+  stepLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: "#F0F0F0",
+    marginHorizontal: 4,
+  },
   stepLineActive: { backgroundColor: "#FF6B35" },
   scrollContent: { padding: 20, paddingBottom: 300 },
   stepContent: { flex: 1 },
-  stepHeader: { fontSize: 20, fontFamily: "Raleway-Bold", color: "#333", marginBottom: 20 },
+  stepHeader: {
+    fontSize: 20,
+    fontFamily: "Raleway-Bold",
+    color: "#333",
+    marginBottom: 20,
+  },
   inputContainer: { marginBottom: 20 },
-  label: { fontSize: 14, fontFamily: "Raleway-SemiBold", color: "#FF6B35", marginBottom: 8 },
+  label: {
+    fontSize: 14,
+    fontFamily: "Raleway-SemiBold",
+    color: "#FF6B35",
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: "#F9F9F9",
     borderRadius: 12,
@@ -932,9 +1114,19 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   textArea: { height: 100, textAlignVertical: "top" },
-  row: { flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 20 },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 20,
+  },
   halfWidth: { flex: 1 },
-  chipContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -984,7 +1176,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F9F9F9",
   },
-  addImageText: { fontSize: 12, fontFamily: "Raleway-Medium", color: "#FF6B35", marginTop: 4 },
+  addImageText: {
+    fontSize: 12,
+    fontFamily: "Raleway-Medium",
+    color: "#FF6B35",
+    marginTop: 4,
+  },
   locationButton: {
     minHeight: 200,
     backgroundColor: "#F9F9F9",
@@ -1009,14 +1206,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  mapOverlayText: { fontSize: 12, color: "#333", flex: 1, fontFamily: "Raleway-Medium" },
+  mapOverlayText: {
+    fontSize: 12,
+    color: "#333",
+    flex: 1,
+    fontFamily: "Raleway-Medium",
+  },
   locationPlaceholder: { alignItems: "center", gap: 10 },
   locationPlaceholderText: { color: "#999", fontFamily: "Raleway" },
-  switchRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
   ruleInputRow: { flexDirection: "row", gap: 10 },
-  addRuleButton: { width: 48, height: 48, backgroundColor: "#FF6B35", borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  addRuleButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#FF6B35",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   rulesList: { marginTop: 16, gap: 8 },
-  ruleItem: { flexDirection: "row", alignItems: "center", backgroundColor: "#F9F9F9", padding: 12, borderRadius: 10, gap: 10 },
+  ruleItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    padding: 12,
+    borderRadius: 10,
+    gap: 10,
+  },
   ruleText: { flex: 1, fontSize: 14, color: "#333", fontFamily: "Raleway" },
   footer: { marginTop: 40 },
   button: {

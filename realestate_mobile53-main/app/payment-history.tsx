@@ -10,8 +10,16 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { BorderRadius, Colors, Spacing, Typography } from "../components/styles";
-import { PaymentTransactionSummary, userService } from "../services/userService";
+import {
+  BorderRadius,
+  Colors,
+  Spacing,
+  Typography,
+} from "../components/styles";
+import {
+  PaymentTransactionSummary,
+  userService,
+} from "../services/userService";
 
 const kindLabels: Record<PaymentTransactionSummary["kind"], string> = {
   pack_purchase: "Package payment",
@@ -27,7 +35,10 @@ const statusColors: Record<PaymentTransactionSummary["status"], string> = {
   expired: "#6B7280",
 };
 
-const boostPlanLabels: Record<NonNullable<PaymentTransactionSummary["boostPlan"]>, string> = {
+const boostPlanLabels: Record<
+  NonNullable<PaymentTransactionSummary["boostPlan"]>,
+  string
+> = {
   "1day": "1 day boost",
   "3day": "3 day boost",
   "7day": "7 day boost",
@@ -40,9 +51,8 @@ const packLabels: Record<string, string> = {
   platinum: "Platinum",
 };
 
-const formatStatus = (status: PaymentTransactionSummary["status"]) => (
-  status.charAt(0).toUpperCase() + status.slice(1)
-);
+const formatStatus = (status: PaymentTransactionSummary["status"]) =>
+  status.charAt(0).toUpperCase() + status.slice(1);
 
 const formatDate = (value?: string | null) => {
   if (!value) {
@@ -79,15 +89,25 @@ const getTransactionSubtitle = (transaction: PaymentTransactionSummary) => {
   }
 
   if (transaction.kind === "property_boost") {
-    return transaction.property?.title || transaction.description || "Property listing boost";
+    return (
+      transaction.property?.title ||
+      transaction.description ||
+      "Property listing boost"
+    );
   }
 
-  return transaction.vehicle?.title || transaction.description || "Vehicle listing boost";
+  return (
+    transaction.vehicle?.title ||
+    transaction.description ||
+    "Vehicle listing boost"
+  );
 };
 
 export default function PaymentHistoryScreen() {
   const router = useRouter();
-  const [transactions, setTransactions] = useState<PaymentTransactionSummary[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTransactionSummary[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,31 +140,51 @@ export default function PaymentHistoryScreen() {
       <View style={styles.cardHeader}>
         <View style={styles.iconWrap}>
           <Ionicons
-            name={item.kind === "pack_purchase" ? "card-outline" : "flash-outline"}
+            name={
+              item.kind === "pack_purchase" ? "card-outline" : "flash-outline"
+            }
             size={20}
             color={Colors.accent}
           />
         </View>
         <View style={styles.cardTitleWrap}>
           <Text style={styles.cardTitle}>{getTransactionTitle(item)}</Text>
-          <Text style={styles.cardSubtitle}>{getTransactionSubtitle(item)}</Text>
+          <Text style={styles.cardSubtitle}>
+            {getTransactionSubtitle(item)}
+          </Text>
         </View>
-        <Text style={styles.amount}>{item.amount} {item.currency}</Text>
+        <Text style={styles.amount}>
+          {item.amount} {item.currency}
+        </Text>
       </View>
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>{kindLabels[item.kind]}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColors[item.status]}1A` }]}>
-          <Text style={[styles.statusText, { color: statusColors[item.status] }]}>{formatStatus(item.status)}</Text>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: `${statusColors[item.status]}1A` },
+          ]}
+        >
+          <Text
+            style={[styles.statusText, { color: statusColors[item.status] }]}
+          >
+            {formatStatus(item.status)}
+          </Text>
         </View>
       </View>
-      <Text style={styles.dateText}>{formatDate(item.paidAt || item.processedAt || item.createdAt)}</Text>
+      <Text style={styles.dateText}>
+        {formatDate(item.paidAt || item.processedAt || item.createdAt)}
+      </Text>
     </View>
   );
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Payment History</Text>
@@ -161,7 +201,10 @@ export default function PaymentHistoryScreen() {
           <Ionicons name="alert-circle-outline" size={44} color="#D14343" />
           <Text style={styles.stateTitle}>Could not load payment history</Text>
           <Text style={styles.stateText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => loadHistory()}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => loadHistory()}
+          >
             <Text style={styles.retryButtonText}>Try again</Text>
           </TouchableOpacity>
         </View>
@@ -170,7 +213,9 @@ export default function PaymentHistoryScreen() {
           data={transactions}
           keyExtractor={(item) => item.transactionId}
           renderItem={renderTransaction}
-          contentContainerStyle={transactions.length ? styles.listContent : styles.emptyContent}
+          contentContainerStyle={
+            transactions.length ? styles.listContent : styles.emptyContent
+          }
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -181,9 +226,16 @@ export default function PaymentHistoryScreen() {
           }
           ListEmptyComponent={
             <View style={styles.centerState}>
-              <Ionicons name="receipt-outline" size={44} color={Colors.textSecondary} />
+              <Ionicons
+                name="receipt-outline"
+                size={44}
+                color={Colors.textSecondary}
+              />
               <Text style={styles.stateTitle}>No payments yet</Text>
-              <Text style={styles.stateText}>Package purchases and boost payments will appear here once they are created.</Text>
+              <Text style={styles.stateText}>
+                Package purchases and boost payments will appear here once they
+                are created.
+              </Text>
             </View>
           }
         />

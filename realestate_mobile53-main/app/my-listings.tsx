@@ -38,8 +38,7 @@ export default function MyListingsScreen() {
   const { isSeller, activeView, isBothMode, userInterest } = useInterest();
 
   const currentMode = isBothMode ? activeView : userInterest;
-  const isVehicleMode =
-    currentMode === "cars";
+  const isVehicleMode = currentMode === "cars";
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -52,11 +51,9 @@ export default function MyListingsScreen() {
 
   useEffect(() => {
     if (!isSeller) {
-      Alert.alert(
-        "Access Denied",
-        "Only sellers can access listings.",
-        [{ text: "OK", onPress: () => router.replace("/(tabs)/Explore") }]
-      );
+      Alert.alert("Access Denied", "Only sellers can access listings.", [
+        { text: "OK", onPress: () => router.replace("/(tabs)/Explore") },
+      ]);
     }
   }, [isSeller, router]);
 
@@ -122,20 +119,20 @@ export default function MyListingsScreen() {
         return today >= start && today <= end;
       });
     },
-    [ownerBookings, isVehicleMode]
+    [ownerBookings, isVehicleMode],
   );
 
   const activeBoostedCount = useMemo(
     () => allListings.filter((item) => item.isPromoted === true).length,
-    [allListings]
+    [allListings],
   );
 
   const pendingBookedCount = useMemo(
     () =>
       allListings.filter((item) =>
-        isBookedToday(item._id || (item as any).id || "")
+        isBookedToday(item._id || (item as any).id || ""),
       ).length,
-    [allListings, isBookedToday]
+    [allListings, isBookedToday],
   );
 
   const filteredListings = useMemo(() => {
@@ -144,7 +141,7 @@ export default function MyListingsScreen() {
         return allListings.filter((item) => item.isPromoted === true);
       case "pending":
         return allListings.filter((item) =>
-          isBookedToday(item._id || (item as any).id || "")
+          isBookedToday(item._id || (item as any).id || ""),
         );
       default:
         return allListings;
@@ -175,7 +172,7 @@ export default function MyListingsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -202,7 +199,7 @@ export default function MyListingsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -220,13 +217,20 @@ export default function MyListingsScreen() {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "active": return "#34C759";
-      case "inactive": return "#FF9500";
-      case "sold": return "#FF3B30";
-      case "rented": return "#007AFF";
-      case "pending": return "#FF9500";
-      case "archived": return "#8E8E93";
-      default: return "#8E8E93";
+      case "active":
+        return "#34C759";
+      case "inactive":
+        return "#FF9500";
+      case "sold":
+        return "#FF3B30";
+      case "rented":
+        return "#007AFF";
+      case "pending":
+        return "#FF9500";
+      case "archived":
+        return "#8E8E93";
+      default:
+        return "#8E8E93";
     }
   };
 
@@ -253,8 +257,8 @@ export default function MyListingsScreen() {
         ? `${vehicle.pricing?.currency || "TND"} ${vehicle.pricing?.salePrice?.toLocaleString()}`
         : `${vehicle.pricing?.currency || "TND"} ${vehicle.pricing?.rentPrice?.toLocaleString()}/${vehicle.pricing?.rentPeriod}`
       : property.listingType === "sale"
-      ? `TND ${property.pricing?.salePrice?.toLocaleString()}`
-      : `TND ${property.pricing?.rentPrice?.toLocaleString()}/${property.pricing?.rentPeriod}`;
+        ? `TND ${property.pricing?.salePrice?.toLocaleString()}`
+        : `TND ${property.pricing?.rentPrice?.toLocaleString()}/${property.pricing?.rentPeriod}`;
 
     const location = isVehicleMode
       ? `${vehicle.location?.city}, ${vehicle.location?.country}`
@@ -262,8 +266,12 @@ export default function MyListingsScreen() {
 
     const views = isVehicleMode ? vehicle.views || 0 : property.views || 0;
     const likes = isVehicleMode
-      ? Array.isArray(vehicle.likes) ? vehicle.likes.length : 0
-      : typeof property.likes === "number" ? property.likes : 0;
+      ? Array.isArray(vehicle.likes)
+        ? vehicle.likes.length
+        : 0
+      : typeof property.likes === "number"
+        ? property.likes
+        : 0;
 
     const isBoosted = item.isPromoted === true;
     const isBooked = isBookedToday(id);
@@ -308,9 +316,12 @@ export default function MyListingsScreen() {
         </View>
 
         <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {title}
+          </Text>
           <Text style={styles.cardLocation} numberOfLines={1}>
-            <Ionicons name="location-outline" size={13} color="#666" /> {location}
+            <Ionicons name="location-outline" size={13} color="#666" />{" "}
+            {location}
           </Text>
 
           {!isVehicleMode && (
@@ -335,7 +346,8 @@ export default function MyListingsScreen() {
                 <View style={styles.detailChip}>
                   <Ionicons name="resize-outline" size={14} color="#666" />
                   <Text style={styles.detailChipText}>
-                    {property.propertyDetails.area} {property.propertyDetails.areaUnit}
+                    {property.propertyDetails.area}{" "}
+                    {property.propertyDetails.areaUnit}
                   </Text>
                 </View>
               )}
@@ -490,10 +502,14 @@ export default function MyListingsScreen() {
             tab === "all"
               ? allListings.length
               : tab === "active"
-              ? activeBoostedCount
-              : pendingBookedCount;
+                ? activeBoostedCount
+                : pendingBookedCount;
           const label =
-            tab === "all" ? "All" : tab === "active" ? "Boosted" : "Booked Today";
+            tab === "all"
+              ? "All"
+              : tab === "active"
+                ? "Boosted"
+                : "Booked Today";
           const isActive = filter === tab;
           return (
             <TouchableOpacity
@@ -540,15 +556,15 @@ export default function MyListingsScreen() {
               {filter === "all"
                 ? "No listings yet"
                 : filter === "active"
-                ? "No boosted listings"
-                : "Nothing booked for today"}
+                  ? "No boosted listings"
+                  : "Nothing booked for today"}
             </Text>
             <Text style={styles.emptyText}>
               {filter === "all"
                 ? "Add your first listing to get started"
                 : filter === "active"
-                ? "Boost a listing to appear at the top of searches"
-                : "Your listings have no active bookings today"}
+                  ? "Boost a listing to appear at the top of searches"
+                  : "Your listings have no active bookings today"}
             </Text>
             {filter === "all" && (
               <TouchableOpacity
@@ -702,7 +718,11 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 32,
   },
-  addFirstBtnText: { fontSize: 15, fontFamily: "Raleway-SemiBold", color: "white" },
+  addFirstBtnText: {
+    fontSize: 15,
+    fontFamily: "Raleway-SemiBold",
+    color: "white",
+  },
   card: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -744,7 +764,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  boostBadgeText: { fontSize: 11, fontFamily: "Raleway-SemiBold", color: "white" },
+  boostBadgeText: {
+    fontSize: 11,
+    fontFamily: "Raleway-SemiBold",
+    color: "white",
+  },
   bookedBadge: {
     position: "absolute",
     bottom: 10,
@@ -757,7 +781,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  bookedBadgeText: { fontSize: 11, fontFamily: "Raleway-SemiBold", color: "white" },
+  bookedBadgeText: {
+    fontSize: 11,
+    fontFamily: "Raleway-SemiBold",
+    color: "white",
+  },
   cardInfo: { padding: 14 },
   cardTitle: {
     fontSize: 17,
@@ -811,7 +839,11 @@ const styles = StyleSheet.create({
   editBtn: { backgroundColor: "#007AFF" },
   archiveBtn: { backgroundColor: "#8E8E93" },
   deleteBtn: { flex: 0, paddingHorizontal: 14, backgroundColor: "#FF3B30" },
-  actionBtnText: { fontSize: 13, fontFamily: "Raleway-SemiBold", color: "white" },
+  actionBtnText: {
+    fontSize: 13,
+    fontFamily: "Raleway-SemiBold",
+    color: "white",
+  },
   archivedNote: {
     flexDirection: "row",
     alignItems: "center",
@@ -839,4 +871,3 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
 });
-

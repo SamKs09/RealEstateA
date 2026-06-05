@@ -12,7 +12,11 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "../hooks/useTranslation";
-import { getListingAnalytics, formatTimeAgo, AnalyticsData } from "../services/analyticsService";
+import {
+  getListingAnalytics,
+  formatTimeAgo,
+  AnalyticsData,
+} from "../services/analyticsService";
 
 const { width } = Dimensions.get("window");
 
@@ -20,11 +24,13 @@ export default function ListingAnalyticsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { t } = useTranslation();
-  
+
   const listingId = params.id as string;
-  const listingTitle = params.title as string || "Property";
-  const listingType = (params.type as string || "property") as "property" | "vehicle";
-  
+  const listingTitle = (params.title as string) || "Property";
+  const listingType = ((params.type as string) || "property") as
+    | "property"
+    | "vehicle";
+
   const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +61,7 @@ export default function ListingAnalyticsScreen() {
 
   const renderBarChart = () => {
     if (!analytics) return null;
-    
+
     const maxHeight = 120;
     const maxValue = getMaxViewCount();
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -66,7 +72,7 @@ export default function ListingAnalyticsScreen() {
           {analytics.weeklyViews.map((value, index) => {
             const barHeight = maxValue > 0 ? (value / maxValue) * maxHeight : 0;
             const isHighest = value === maxValue && value > 0;
-            
+
             return (
               <View key={index} style={styles.barWrapper}>
                 <View
@@ -74,7 +80,11 @@ export default function ListingAnalyticsScreen() {
                     styles.bar,
                     {
                       height: Math.max(barHeight, 4), // Minimum height for visibility
-                      backgroundColor: isHighest ? "#FF6B35" : index % 2 === 0 ? "#FF6B35" : "#FFB399",
+                      backgroundColor: isHighest
+                        ? "#FF6B35"
+                        : index % 2 === 0
+                          ? "#FF6B35"
+                          : "#FFB399",
                     },
                   ]}
                 />
@@ -90,13 +100,18 @@ export default function ListingAnalyticsScreen() {
   const renderInquiryItem = (inquiry: any) => {
     const avatarLetter = inquiry.name.charAt(0).toUpperCase();
     const timeAgo = formatTimeAgo(inquiry.time);
-    
+
     return (
       <TouchableOpacity key={inquiry.id} style={styles.inquiryItem}>
-        <View style={[styles.avatar, { backgroundColor: avatarLetter === "A" ? "#FF6B35" : "#FF9800" }]}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: avatarLetter === "A" ? "#FF6B35" : "#FF9800" },
+          ]}
+        >
           <Text style={styles.avatarText}>{avatarLetter}</Text>
         </View>
-        
+
         <View style={styles.inquiryContent}>
           <View style={styles.inquiryHeader}>
             <Text style={styles.inquiryName}>{inquiry.name}</Text>
@@ -123,7 +138,7 @@ export default function ListingAnalyticsScreen() {
           <Text style={styles.headerTitle}>Listing Analytics</Text>
           <View style={{ width: 40 }} />
         </View>
-        
+
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B35" />
           <Text style={styles.loadingText}>Loading analytics...</Text>
@@ -145,11 +160,13 @@ export default function ListingAnalyticsScreen() {
           <Text style={styles.headerTitle}>Listing Analytics</Text>
           <View style={{ width: 40 }} />
         </View>
-        
+
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#FF6B35" />
           <Text style={styles.errorTitle}>Unable to Load Analytics</Text>
-          <Text style={styles.errorMessage}>{error || "Please try again later"}</Text>
+          <Text style={styles.errorMessage}>
+            {error || "Please try again later"}
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchAnalytics}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -172,7 +189,10 @@ export default function ListingAnalyticsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Property Title */}
         <Text style={styles.propertyTitle}>{listingTitle}</Text>
 
@@ -182,12 +202,12 @@ export default function ListingAnalyticsScreen() {
             <Text style={styles.statNumber}>{analytics.totalViews}</Text>
             <Text style={styles.statLabel}>Total Views</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{analytics.saved}</Text>
             <Text style={styles.statLabel}>Saved</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{analytics.inquiries}</Text>
             <Text style={styles.statLabel}>Inquiries</Text>
@@ -204,7 +224,9 @@ export default function ListingAnalyticsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Inquiries</Text>
           <View style={styles.inquiriesList}>
-            {analytics.recentInquiries.map((inquiry) => renderInquiryItem(inquiry))}
+            {analytics.recentInquiries.map((inquiry) =>
+              renderInquiryItem(inquiry),
+            )}
           </View>
         </View>
       </ScrollView>
