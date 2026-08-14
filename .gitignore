@@ -1,0 +1,39 @@
+﻿# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+bower_components/
+venv/
+.venv/
+env/
+
+# Build & Output
+dist/
+build/
+out/
+.next/
+.nuxt/
+target/
+*.class
+*.exe
+*.pyc
+__pycache__/
+
+# Mobile / Flutter / Android / iOS
+.dart_tool/
+.fvm/
+.pub-cache/
+.pub/
+.gradle/
+*.apk
+*.aab
+
+# Logs & Temp
+*.log
+.DS_Store
+Thumbs.db
